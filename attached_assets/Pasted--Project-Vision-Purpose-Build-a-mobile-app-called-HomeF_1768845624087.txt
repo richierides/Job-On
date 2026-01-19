@@ -1,0 +1,37 @@
+### Project Vision & Purpose
+Build a mobile app called "HomeFix AI." The purpose is to provide a frictionless way for homeowners to document household repairs and maintenance tasks. Instead of typing, the user uses a "See it, Say it, Save it" workflow. The app turns a casual video walk-through of a problem into a structured, professional maintenance log.
+
+### Tech Stack
+- Frontend: React Native with Expo (mobile-first).
+- Backend: Python (FastAPI) or Node.js.
+- Database: Replit PostgreSQL.
+- AI: OpenAI Whisper (transcription) and GPT-4o (structuring data).
+
+### Core Features & Interaction
+1. "Hold to Record" Camera: 
+   - A prominent recording button on the main screen.
+   - Logic: Use 'onPressIn' to start recording video/audio and 'onPressOut' to stop.
+   - UI: Show a recording indicator/border while the button is held.
+   - Capture: Extract the first frame of the video to use as a task thumbnail.
+
+2. AI Data Pipeline (The "Blob" Handling):
+   - Send the video file from the mobile device to the backend using 'multipart/form-data'. 
+   - Backend should extract audio for Whisper and send the transcript to GPT-4o.
+   - AI Logic: Analyze the transcript to create a "Job Card" containing:
+     - Job Title: A professional summary (e.g., "Replace leaky kitchen U-bend").
+     - Effort Score: A 1-5 rating based on complexity.
+     - Location: Identify the room/area mentioned (e.g., "Master Bedroom", "Garden"). Default to "General" if not found.
+     - Priority: Default to "Medium".
+
+3. Task Management Dashboard:
+   - A scrollable list of "Job Cards" showing the thumbnail, title, location, and effort.
+   - Features: 
+     - Tap a card to edit Title or Location inline.
+     - A dropdown to toggle Priority (Low, Medium, High).
+     - Swipe-to-delete functionality.
+     - A status toggle (Pending / Completed).
+
+### UX & Technical Requirements
+- Permissions: Handle iOS/Android camera and microphone permission requests gracefully.
+- Feedback: Display a "Generating Task..." overlay with a spinner while the AI is processing the video.
+- Design: Clean, high-contrast, utility-focused UI using Tailwind CSS (NativeWind) or React Native Paper.
