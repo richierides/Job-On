@@ -63,8 +63,8 @@ export function getChipVariantForEffort(effort: number): ChipVariant {
 }
 
 export function Chip({ label, variant = "default", onPress, style, testID }: ChipProps) {
-  const { colorScheme, theme } = useTheme();
-  const colors = colorScheme === "dark" ? darkVariantColors : variantColors;
+  const { isDark, theme } = useTheme();
+  const colors = isDark ? darkVariantColors : variantColors;
   const variantStyle = colors[variant];
 
   const content = (

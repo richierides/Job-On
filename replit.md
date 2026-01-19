@@ -16,7 +16,8 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: TanStack React Query for server state synchronization
 - **Styling**: Custom theme system with light/dark mode support, no Tailwind/NativeWind
 - **Animations**: React Native Reanimated for smooth gesture and UI animations
-- **Key Screens**: Task Dashboard (main), Recording Modal (camera capture), Task Detail (edit), Settings
+- **Key Screens**: Task Dashboard (Notion-style table with inline editing), Recording Modal (camera capture), Task Detail (edit), Settings
+- **Components**: Chip (color-coded property badges), PropertyPicker (bottom sheet for inline editing)
 
 ### Backend Architecture
 - **Framework**: Express.js with TypeScript
