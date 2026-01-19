@@ -111,16 +111,17 @@ export function Chip({ label, variant = "default", onPress, style, testID }: Chi
 
 const styles = StyleSheet.create({
   chip: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
     alignSelf: "flex-start",
   },
   pressed: {
     opacity: 0.7,
   },
   label: {
-    ...Typography.caption,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: "500",
   },
 });
