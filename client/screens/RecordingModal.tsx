@@ -11,7 +11,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system";
+import { File } from "expo-file-system/next";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -153,14 +153,12 @@ export default function RecordingModal() {
         );
 
         // Read video file as base64
-        const videoBase64 = await FileSystem.readAsStringAsync(videoUri, {
-          encoding: "base64",
-        });
+        const videoFile = new File(videoUri);
+        const videoBase64 = await videoFile.base64();
 
         // Read thumbnail as base64
-        const thumbnailBase64 = await FileSystem.readAsStringAsync(thumbnailUri, {
-          encoding: "base64",
-        });
+        const thumbnailFile = new File(thumbnailUri);
+        const thumbnailBase64 = await thumbnailFile.base64();
 
         // Send to backend for AI processing
         const response = await fetch(new URL("/api/tasks/process-video", getApiUrl()).href, {
