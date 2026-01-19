@@ -1,29 +1,37 @@
 {
   "expo": {
-    "name": "my-app",
-    "slug": "my-app",
+    "name": "HomeFix AI",
+    "slug": "homefix-ai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "homefixai",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.homefix.ai",
+      "infoPlist": {
+        "NSCameraUsageDescription": "HomeFix AI needs camera access to record videos of your home maintenance issues.",
+        "NSMicrophoneUsageDescription": "HomeFix AI needs microphone access to capture audio descriptions of your tasks."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FF6B35",
+        "foregroundImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.homefix.ai",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       [
@@ -32,13 +40,21 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#FF6B35",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#1A1A1A"
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "HomeFix AI needs camera access to record videos of your home maintenance issues.",
+          "microphonePermission": "HomeFix AI needs microphone access to capture audio descriptions of your tasks.",
+          "recordAudioAndroid": true
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true
