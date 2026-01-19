@@ -23,6 +23,8 @@ import { apiRequest } from "@/lib/query-client";
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "TaskDashboard">;
 
 type PropertyType = "priority" | "status" | "location" | "effort";
+type SortColumn = "title" | "location" | "priority" | "effort" | "status";
+type SortDirection = "asc" | "desc";
 
 interface PickerState {
   visible: boolean;
@@ -31,6 +33,9 @@ interface PickerState {
   currentValue: string | number;
 }
 
+const PRIORITY_ORDER: Record<string, number> = { "Low": 1, "Medium": 2, "High": 3 };
+const STATUS_ORDER: Record<string, number> = { "Pending": 1, "Completed": 2 };
+
 export default function TaskDashboardScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -38,6 +43,8 @@ export default function TaskDashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("status");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [pickerState, setPickerState] = useState<PickerState>({
     visible: false,
     propertyType: "status",
@@ -136,13 +143,41 @@ export default function TaskDashboardScreen() {
     setPickerState((prev) => ({ ...prev, visible: false }));
   }, []);
 
+  const handleSort = useCallback((column: SortColumn) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  }, [sortColumn]);
+
   const sortedTasks = React.useMemo(() => {
     return [...tasks].sort((a, b) => {
-      if (a.status === "Pending" && b.status === "Completed") return -1;
-      if (a.status === "Completed" && b.status === "Pending") return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      let comparison = 0;
+      
+      switch (sortColumn) {
+        case "title":
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case "location":
+          comparison = a.location.localeCompare(b.location);
+          break;
+        case "priority":
+          comparison = (PRIORITY_ORDER[a.priority] || 0) - (PRIORITY_ORDER[b.priority] || 0);
+          break;
+        case "effort":
+          comparison = a.effortScore - b.effortScore;
+          break;
+        case "status":
+          comparison = (STATUS_ORDER[a.status] || 0) - (STATUS_ORDER[b.status] || 0);
+          break;
+      }
+      
+      return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [tasks]);
+  }, [tasks, sortColumn, sortDirection]);
 
   const getEffortLabel = (score: number) => {
     const labels = ["1", "2", "3", "4", "5"];
@@ -177,31 +212,56 @@ export default function TaskDashboardScreen() {
         ) : (
           <View style={[styles.tableContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
             <View style={[styles.headerRow, { borderBottomColor: theme.border }]}>
-              <View style={styles.titleColumn}>
-                <ThemedText style={[styles.headerText, { color: theme.textSecondary }]}>
-                  Task
-                </ThemedText>
-              </View>
-              <View style={styles.chipColumn}>
-                <ThemedText style={[styles.headerText, { color: theme.textSecondary }]}>
-                  Location
-                </ThemedText>
-              </View>
-              <View style={styles.chipColumn}>
-                <ThemedText style={[styles.headerText, { color: theme.textSecondary }]}>
-                  Priority
-                </ThemedText>
-              </View>
-              <View style={styles.smallColumn}>
-                <ThemedText style={[styles.headerText, { color: theme.textSecondary }]}>
-                  Effort
-                </ThemedText>
-              </View>
-              <View style={styles.chipColumn}>
-                <ThemedText style={[styles.headerText, { color: theme.textSecondary }]}>
-                  Status
-                </ThemedText>
-              </View>
+              <Pressable style={styles.titleColumn} onPress={() => handleSort("title")}>
+                <View style={styles.headerContent}>
+                  <ThemedText style={[styles.headerText, { color: sortColumn === "title" ? theme.primary : theme.textSecondary }]}>
+                    Task
+                  </ThemedText>
+                  {sortColumn === "title" ? (
+                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
+                  ) : null}
+                </View>
+              </Pressable>
+              <Pressable style={styles.chipColumn} onPress={() => handleSort("location")}>
+                <View style={styles.headerContent}>
+                  <ThemedText style={[styles.headerText, { color: sortColumn === "location" ? theme.primary : theme.textSecondary }]}>
+                    Loc
+                  </ThemedText>
+                  {sortColumn === "location" ? (
+                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
+                  ) : null}
+                </View>
+              </Pressable>
+              <Pressable style={styles.chipColumn} onPress={() => handleSort("priority")}>
+                <View style={styles.headerContent}>
+                  <ThemedText style={[styles.headerText, { color: sortColumn === "priority" ? theme.primary : theme.textSecondary }]}>
+                    Pri
+                  </ThemedText>
+                  {sortColumn === "priority" ? (
+                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
+                  ) : null}
+                </View>
+              </Pressable>
+              <Pressable style={styles.smallColumn} onPress={() => handleSort("effort")}>
+                <View style={styles.headerContent}>
+                  <ThemedText style={[styles.headerText, { color: sortColumn === "effort" ? theme.primary : theme.textSecondary }]}>
+                    Eff
+                  </ThemedText>
+                  {sortColumn === "effort" ? (
+                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
+                  ) : null}
+                </View>
+              </Pressable>
+              <Pressable style={styles.chipColumn} onPress={() => handleSort("status")}>
+                <View style={styles.headerContent}>
+                  <ThemedText style={[styles.headerText, { color: sortColumn === "status" ? theme.primary : theme.textSecondary }]}>
+                    Status
+                  </ThemedText>
+                  {sortColumn === "status" ? (
+                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
+                  ) : null}
+                </View>
+              </Pressable>
             </View>
 
             {sortedTasks.map((task, index) => (
@@ -324,6 +384,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.3,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   taskRow: {
     flexDirection: "row",
