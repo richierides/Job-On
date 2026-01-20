@@ -64,6 +64,7 @@ export const tasks = pgTable("tasks", {
   transcript: text("transcript"),
   householdId: integer("household_id"),
   assignedToId: integer("assigned_to_id"),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
