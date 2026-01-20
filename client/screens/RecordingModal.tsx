@@ -28,6 +28,7 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { ProcessingOverlay } from "@/components/ProcessingOverlay";
 import { useTheme } from "@/hooks/useTheme";
+import { useUserSession } from "@/contexts/UserSessionContext";
 import { Spacing, AppColors, BorderRadius } from "@/constants/theme";
 import { getApiUrl } from "@/lib/query-client";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -41,6 +42,7 @@ export default function RecordingModal() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
+  const { session } = useUserSession();
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -169,6 +171,7 @@ export default function RecordingModal() {
           body: JSON.stringify({
             video: videoBase64,
             thumbnail: thumbnailBase64,
+            householdId: session.householdId,
           }),
         });
 
@@ -186,7 +189,7 @@ export default function RecordingModal() {
         setIsProcessing(false);
       }
     },
-    [navigation, queryClient]
+    [navigation, queryClient, session.householdId]
   );
 
   useEffect(() => {

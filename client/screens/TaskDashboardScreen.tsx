@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import { ScrollView, RefreshControl, StyleSheet, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -15,14 +15,15 @@ import { Chip, getChipVariantForPriority, getChipVariantForStatus, getChipVarian
 import { PropertyPicker } from "@/components/PropertyPicker";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useUserSession } from "@/contexts/UserSessionContext";
 import { Spacing, AppColors, Typography, BorderRadius } from "@/constants/theme";
-import { Task, UpdateTask } from "@shared/schema";
+import { Task, UpdateTask, HouseholdMember } from "@shared/schema";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "TaskDashboard">;
 
-type PropertyType = "priority" | "status" | "location" | "effort";
+type PropertyType = "priority" | "status" | "location" | "effort" | "assignee";
 type SortColumn = "title" | "location" | "priority" | "effort" | "status";
 type SortDirection = "asc" | "desc";
 
@@ -42,6 +43,7 @@ export default function TaskDashboardScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
+  const { session } = useUserSession();
   const [isProcessing, setIsProcessing] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("status");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -53,8 +55,33 @@ export default function TaskDashboardScreen() {
   });
 
   const { data: tasks = [], isLoading, refetch } = useQuery<Task[]>({
-    queryKey: ["/api/tasks"],
+    queryKey: ["/api/tasks", { householdId: session.householdId }],
+    queryFn: async () => {
+      const url = session.householdId 
+        ? `${getApiUrl()}/api/tasks?householdId=${session.householdId}`
+        : `${getApiUrl()}/api/tasks`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch tasks");
+      return response.json();
+    },
   });
+
+  const { data: members = [] } = useQuery<HouseholdMember[]>({
+    queryKey: ["/api/households", session.householdId, "members"],
+    queryFn: async () => {
+      if (!session.householdId) return [];
+      const response = await fetch(`${getApiUrl()}/api/households/${session.householdId}/members`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!session.householdId,
+  });
+
+  const membersMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    members.forEach(m => { map[m.id] = m.name; });
+    return map;
+  }, [members]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: UpdateTask }) => {
@@ -101,6 +128,9 @@ export default function TaskDashboardScreen() {
         case "effort":
           currentValue = task.effortScore;
           break;
+        case "assignee":
+          currentValue = task.assignedToId || 0;
+          break;
         default:
           currentValue = "";
       }
@@ -131,6 +161,9 @@ export default function TaskDashboardScreen() {
           break;
         case "effort":
           updateData.effortScore = Number(value);
+          break;
+        case "assignee":
+          updateData.assignedToId = value === 0 ? null : Number(value);
           break;
       }
 
@@ -262,6 +295,11 @@ export default function TaskDashboardScreen() {
                   ) : null}
                 </View>
               </Pressable>
+              <View style={styles.assigneeColumn}>
+                <ThemedText style={[styles.headerText, { color: theme.textSecondary }]}>
+                  Who
+                </ThemedText>
+              </View>
             </View>
 
             {sortedTasks.map((task, index) => (
@@ -334,6 +372,17 @@ export default function TaskDashboardScreen() {
                     testID={`chip-status-${task.id}`}
                   />
                 </View>
+                <View style={styles.assigneeColumn}>
+                  <Pressable onPress={() => openPicker(task, "assignee")}>
+                    <View style={[styles.assigneeAvatar, { backgroundColor: task.assignedToId ? theme.primary + "20" : theme.backgroundSecondary }]}>
+                      <ThemedText style={[styles.assigneeInitials, { color: task.assignedToId ? theme.primary : theme.textSecondary }]}>
+                        {task.assignedToId && membersMap[task.assignedToId] 
+                          ? membersMap[task.assignedToId].charAt(0).toUpperCase()
+                          : "?"}
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+                </View>
               </View>
             ))}
           </View>
@@ -353,6 +402,7 @@ export default function TaskDashboardScreen() {
         currentValue={pickerState.currentValue}
         onSelect={handlePickerSelect}
         onClose={closePicker}
+        members={members}
       />
     </View>
   );
@@ -428,5 +478,21 @@ const styles = StyleSheet.create({
     width: 32,
     alignItems: "center",
     paddingHorizontal: 2,
+  },
+  assigneeColumn: {
+    width: 32,
+    alignItems: "center",
+    paddingHorizontal: 2,
+  },
+  assigneeAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  assigneeInitials: {
+    fontSize: 11,
+    fontWeight: "600",
   },
 });

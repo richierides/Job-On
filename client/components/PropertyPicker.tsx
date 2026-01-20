@@ -13,9 +13,9 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
-import { PRIORITIES, STATUSES, LOCATIONS } from "@shared/schema";
+import { PRIORITIES, STATUSES, LOCATIONS, HouseholdMember } from "@shared/schema";
 
-type PropertyType = "priority" | "status" | "location" | "effort";
+type PropertyType = "priority" | "status" | "location" | "effort" | "assignee";
 
 interface PropertyPickerProps {
   visible: boolean;
@@ -23,18 +23,25 @@ interface PropertyPickerProps {
   currentValue: string | number;
   onSelect: (value: string | number) => void;
   onClose: () => void;
+  members?: HouseholdMember[];
 }
 
-function getOptionsForType(type: PropertyType): (string | number)[] {
+function getOptionsForType(type: PropertyType, members?: HouseholdMember[]): { value: string | number; label: string }[] {
   switch (type) {
     case "priority":
-      return [...PRIORITIES];
+      return PRIORITIES.map(p => ({ value: p, label: p }));
     case "status":
-      return [...STATUSES];
+      return STATUSES.map(s => ({ value: s, label: s }));
     case "location":
-      return [...LOCATIONS];
+      return LOCATIONS.map(l => ({ value: l, label: l }));
     case "effort":
-      return [1, 2, 3, 4, 5];
+      return [1, 2, 3, 4, 5].map(e => ({ value: e, label: getEffortLabel(e) }));
+    case "assignee":
+      const assigneeOptions = [{ value: 0, label: "Unassigned" }];
+      if (members) {
+        members.forEach(m => assigneeOptions.push({ value: m.id, label: m.name }));
+      }
+      return assigneeOptions;
     default:
       return [];
   }
@@ -50,6 +57,8 @@ function getTitleForType(type: PropertyType): string {
       return "Location";
     case "effort":
       return "Effort Score";
+    case "assignee":
+      return "Assign To";
     default:
       return "";
   }
@@ -66,11 +75,12 @@ export function PropertyPicker({
   currentValue,
   onSelect,
   onClose,
+  members,
 }: PropertyPickerProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
 
-  const options = useMemo(() => getOptionsForType(propertyType), [propertyType]);
+  const options = useMemo(() => getOptionsForType(propertyType, members), [propertyType, members]);
   const title = useMemo(() => getTitleForType(propertyType), [propertyType]);
 
   const handleSelect = useCallback(
@@ -80,16 +90,6 @@ export function PropertyPicker({
       onClose();
     },
     [onSelect, onClose]
-  );
-
-  const getDisplayLabel = useCallback(
-    (option: string | number): string => {
-      if (propertyType === "effort" && typeof option === "number") {
-        return getEffortLabel(option);
-      }
-      return String(option);
-    },
-    [propertyType]
   );
 
   return (
@@ -124,15 +124,13 @@ export function PropertyPicker({
             showsVerticalScrollIndicator={false}
           >
             {options.map((option) => {
-              const isSelected =
-                propertyType === "effort"
-                  ? option === currentValue
-                  : String(option) === String(currentValue);
+              const isSelected = option.value === currentValue || 
+                (propertyType !== "effort" && propertyType !== "assignee" && String(option.value) === String(currentValue));
 
               return (
                 <Pressable
-                  key={String(option)}
-                  testID={`option-${option}`}
+                  key={String(option.value)}
+                  testID={`option-${option.value}`}
                   style={({ pressed }) => [
                     styles.option,
                     {
@@ -142,7 +140,7 @@ export function PropertyPicker({
                     },
                     pressed && { opacity: 0.7 },
                   ]}
-                  onPress={() => handleSelect(option)}
+                  onPress={() => handleSelect(option.value)}
                 >
                   <ThemedText
                     style={[
@@ -150,7 +148,7 @@ export function PropertyPicker({
                       isSelected && { color: theme.primary, fontWeight: "600" },
                     ]}
                   >
-                    {getDisplayLabel(option)}
+                    {option.label}
                   </ThemedText>
                   {isSelected ? (
                     <Feather name="check" size={20} color={theme.primary} />

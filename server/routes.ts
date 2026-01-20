@@ -220,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/api/tasks/process-video",
     async (req: Request, res: Response) => {
       try {
-        const { video, thumbnail } = req.body;
+        const { video, thumbnail, householdId } = req.body;
 
         if (!video) {
           return res.status(400).json({ error: "Video data is required" });
@@ -326,6 +326,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
             status: "Pending",
             thumbnailUrl,
             transcript,
+            householdId: householdId || null,
           })
           .returning();
 
