@@ -32,8 +32,18 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL via Drizzle ORM
 - **Schema Location**: `shared/schema.ts`
-- **Main Tables**: `tasks` (job cards with title, location, priority, effort score, status, media URLs), `users` (authentication)
+- **Main Tables**:
+  - `households` - Household groups with 6-character invite codes for sharing
+  - `householdMembers` - Members of households (name only, no authentication required)
+  - `tasks` - Job cards with title, location, priority, effort score, status, householdId, assignedToId
 - **Migrations**: Managed via `drizzle-kit push`
+
+### Household System (No Auth)
+- Users create or join households using 6-character invite codes
+- Members are identified by name only, stored locally via AsyncStorage
+- Tasks belong to households and can be assigned to any household member
+- Session data: `client/contexts/UserSessionContext.tsx` stores memberId, memberName, householdId, householdName, inviteCode
+- Onboarding flow: `OnboardingScreen` handles household creation/joining and member setup
 
 ### Project Structure
 - `client/` - React Native frontend code (components, screens, hooks, navigation)
