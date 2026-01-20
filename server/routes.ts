@@ -141,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get household by ID
   app.get("/api/households/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const [household] = await db.select().from(households).where(eq(households.id, id));
       if (!household) {
         return res.status(404).json({ error: "Household not found" });
@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get household by invite code
   app.get("/api/households/code/:code", async (req: Request, res: Response) => {
     try {
-      const code = req.params.code.toUpperCase();
+      const code = (req.params.code as string).toUpperCase();
       const [household] = await db.select().from(households).where(eq(households.inviteCode, code));
       if (!household) {
         return res.status(404).json({ error: "Invalid invite code" });
@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add member to household
   app.post("/api/households/:id/members", async (req: Request, res: Response) => {
     try {
-      const householdId = parseInt(req.params.id);
+      const householdId = parseInt(req.params.id as string);
       const { name } = req.body;
       if (!name) {
         return res.status(400).json({ error: "Member name is required" });
@@ -189,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all members of a household
   app.get("/api/households/:id/members", async (req: Request, res: Response) => {
     try {
-      const householdId = parseInt(req.params.id);
+      const householdId = parseInt(req.params.id as string);
       const members = await db.select().from(householdMembers).where(eq(householdMembers.householdId, householdId));
       res.json(members);
     } catch (error) {
@@ -201,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get single member
   app.get("/api/members/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const [member] = await db.select().from(householdMembers).where(eq(householdMembers.id, id));
       if (!member) {
         return res.status(404).json({ error: "Member not found" });
