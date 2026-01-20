@@ -5,9 +5,9 @@ import { v4 as uuidv4 } from "uuid";
 import * as fs from "fs";
 import * as path from "path";
 import OpenAI, { toFile } from "openai";
-import { tasks, insertTaskSchema, updateTaskSchema } from "@shared/schema";
+import { tasks, insertTaskSchema, updateTaskSchema, households, householdMembers, insertHouseholdSchema, insertHouseholdMemberSchema } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -34,10 +34,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============ Task CRUD Endpoints ============
 
-  // Get all tasks
+  // Get all tasks (optionally filter by householdId)
   app.get("/api/tasks", async (req: Request, res: Response) => {
     try {
-      const allTasks = await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+      const householdId = req.query.householdId ? parseInt(req.query.householdId as string) : null;
+      let allTasks;
+      if (householdId) {
+        allTasks = await db.select().from(tasks).where(eq(tasks.householdId, householdId)).orderBy(desc(tasks.createdAt));
+      } else {
+        allTasks = await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+      }
       res.json(allTasks);
     } catch (error) {
       console.error("Error fetching tasks:", error);
@@ -101,6 +107,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting task:", error);
       res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // ============ Household Endpoints ============
+
+  // Generate a random invite code
+  const generateInviteCode = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  // Create household
+  app.post("/api/households", async (req: Request, res: Response) => {
+    try {
+      const { name } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: "Household name is required" });
+      }
+      const inviteCode = generateInviteCode();
+      const [household] = await db.insert(households).values({ name, inviteCode }).returning();
+      res.status(201).json(household);
+    } catch (error) {
+      console.error("Error creating household:", error);
+      res.status(500).json({ error: "Failed to create household" });
+    }
+  });
+
+  // Get household by ID
+  app.get("/api/households/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [household] = await db.select().from(households).where(eq(households.id, id));
+      if (!household) {
+        return res.status(404).json({ error: "Household not found" });
+      }
+      res.json(household);
+    } catch (error) {
+      console.error("Error fetching household:", error);
+      res.status(500).json({ error: "Failed to fetch household" });
+    }
+  });
+
+  // Get household by invite code
+  app.get("/api/households/code/:code", async (req: Request, res: Response) => {
+    try {
+      const code = req.params.code.toUpperCase();
+      const [household] = await db.select().from(households).where(eq(households.inviteCode, code));
+      if (!household) {
+        return res.status(404).json({ error: "Invalid invite code" });
+      }
+      res.json(household);
+    } catch (error) {
+      console.error("Error fetching household by code:", error);
+      res.status(500).json({ error: "Failed to fetch household" });
+    }
+  });
+
+  // ============ Household Member Endpoints ============
+
+  // Add member to household
+  app.post("/api/households/:id/members", async (req: Request, res: Response) => {
+    try {
+      const householdId = parseInt(req.params.id);
+      const { name } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: "Member name is required" });
+      }
+      const [member] = await db.insert(householdMembers).values({ householdId, name }).returning();
+      res.status(201).json(member);
+    } catch (error) {
+      console.error("Error adding member:", error);
+      res.status(500).json({ error: "Failed to add member" });
+    }
+  });
+
+  // Get all members of a household
+  app.get("/api/households/:id/members", async (req: Request, res: Response) => {
+    try {
+      const householdId = parseInt(req.params.id);
+      const members = await db.select().from(householdMembers).where(eq(householdMembers.householdId, householdId));
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching members:", error);
+      res.status(500).json({ error: "Failed to fetch members" });
+    }
+  });
+
+  // Get single member
+  app.get("/api/members/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [member] = await db.select().from(householdMembers).where(eq(householdMembers.id, id));
+      if (!member) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+      res.json(member);
+    } catch (error) {
+      console.error("Error fetching member:", error);
+      res.status(500).json({ error: "Failed to fetch member" });
     }
   });
 
