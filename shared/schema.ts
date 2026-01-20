@@ -19,6 +19,38 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// Households Schema
+export const households = pgTable("households", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  inviteCode: text("invite_code").notNull().unique(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertHouseholdSchema = createInsertSchema(households).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Household = typeof households.$inferSelect;
+export type InsertHousehold = z.infer<typeof insertHouseholdSchema>;
+
+// Household Members Schema (no auth - just names)
+export const householdMembers = pgTable("household_members", {
+  id: serial("id").primaryKey(),
+  householdId: integer("household_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertHouseholdMemberSchema = createInsertSchema(householdMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type HouseholdMember = typeof householdMembers.$inferSelect;
+export type InsertHouseholdMember = z.infer<typeof insertHouseholdMemberSchema>;
+
 // HomeFix AI Tasks Schema
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -30,6 +62,8 @@ export const tasks = pgTable("tasks", {
   thumbnailUrl: text("thumbnail_url"),
   videoUrl: text("video_url"),
   transcript: text("transcript"),
+  householdId: integer("household_id"),
+  assignedToId: integer("assigned_to_id"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
