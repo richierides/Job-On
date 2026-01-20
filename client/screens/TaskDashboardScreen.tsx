@@ -11,12 +11,13 @@ import { Feather } from "@expo/vector-icons";
 import { FloatingRecordButton } from "@/components/FloatingRecordButton";
 import { ProcessingOverlay } from "@/components/ProcessingOverlay";
 import { EmptyState } from "@/components/EmptyState";
-import { Chip, getChipVariantForPriority, getChipVariantForStatus, getChipVariantForEffort } from "@/components/Chip";
 import { PropertyPicker } from "@/components/PropertyPicker";
+import { FilterBar, FilterState } from "@/components/FilterBar";
+import { TaskCard } from "@/components/TaskCard";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useUserSession } from "@/contexts/UserSessionContext";
-import { Spacing, AppColors, Typography, BorderRadius } from "@/constants/theme";
+import { Spacing, AppColors, BorderRadius } from "@/constants/theme";
 import { Task, UpdateTask, HouseholdMember } from "@shared/schema";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
@@ -24,8 +25,6 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "TaskDashboard">;
 
 type PropertyType = "priority" | "status" | "location" | "effort" | "assignee";
-type SortColumn = "title" | "location" | "priority" | "effort" | "status";
-type SortDirection = "asc" | "desc";
 
 interface PickerState {
   visible: boolean;
@@ -33,9 +32,6 @@ interface PickerState {
   taskId: number | null;
   currentValue: string | number;
 }
-
-const PRIORITY_ORDER: Record<string, number> = { "Low": 1, "Medium": 2, "High": 3 };
-const STATUS_ORDER: Record<string, number> = { "Pending": 1, "Completed": 2 };
 
 export default function TaskDashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -45,8 +41,13 @@ export default function TaskDashboardScreen() {
   const queryClient = useQueryClient();
   const { session } = useUserSession();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [sortColumn, setSortColumn] = useState<SortColumn>("status");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({
+    status: null,
+    priority: null,
+    location: null,
+    assignedToId: null,
+  });
   const [pickerState, setPickerState] = useState<PickerState>({
     visible: false,
     propertyType: "status",
@@ -97,6 +98,20 @@ export default function TaskDashboardScreen() {
       refetch();
     }, [refetch])
   );
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (filters.status && task.status !== filters.status) return false;
+      if (filters.priority && task.priority !== filters.priority) return false;
+      if (filters.location && task.location !== filters.location) return false;
+      if (filters.assignedToId && task.assignedToId !== filters.assignedToId) return false;
+      return true;
+    });
+  }, [tasks, filters]);
+
+  const activeFilterCount = useMemo(() => {
+    return [filters.status, filters.priority, filters.location, filters.assignedToId].filter(Boolean).length;
+  }, [filters]);
 
   const handleRecordPress = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -155,6 +170,11 @@ export default function TaskDashboardScreen() {
           break;
         case "status":
           updateData.status = String(value);
+          if (value === "Completed") {
+            updateData.completedAt = new Date();
+          } else {
+            updateData.completedAt = null;
+          }
           break;
         case "location":
           updateData.location = String(value);
@@ -176,46 +196,10 @@ export default function TaskDashboardScreen() {
     setPickerState((prev) => ({ ...prev, visible: false }));
   }, []);
 
-  const handleSort = useCallback((column: SortColumn) => {
+  const toggleFilters = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (sortColumn === column) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
-  }, [sortColumn]);
-
-  const sortedTasks = React.useMemo(() => {
-    return [...tasks].sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortColumn) {
-        case "title":
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case "location":
-          comparison = a.location.localeCompare(b.location);
-          break;
-        case "priority":
-          comparison = (PRIORITY_ORDER[a.priority] || 0) - (PRIORITY_ORDER[b.priority] || 0);
-          break;
-        case "effort":
-          comparison = a.effortScore - b.effortScore;
-          break;
-        case "status":
-          comparison = (STATUS_ORDER[a.status] || 0) - (STATUS_ORDER[b.status] || 0);
-          break;
-      }
-      
-      return sortDirection === "asc" ? comparison : -comparison;
-    });
-  }, [tasks, sortColumn, sortDirection]);
-
-  const getEffortLabel = (score: number) => {
-    const labels = ["1", "2", "3", "4", "5"];
-    return labels[score - 1] || String(score);
-  };
+    setShowFilters((prev) => !prev);
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -237,155 +221,51 @@ export default function TaskDashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {sortedTasks.length === 0 && !isLoading ? (
+        <Pressable
+          style={[styles.filterToggle, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}
+          onPress={toggleFilters}
+        >
+          <View style={styles.filterToggleLeft}>
+            <Feather name="filter" size={18} color={theme.textSecondary} />
+            <ThemedText style={[styles.filterToggleText, { color: theme.text }]}>
+              {showFilters ? "Hide Filters" : "Show Filters"}
+            </ThemedText>
+            {activeFilterCount > 0 ? (
+              <View style={[styles.filterBadge, { backgroundColor: theme.primary }]}>
+                <ThemedText style={styles.filterBadgeText}>{activeFilterCount}</ThemedText>
+              </View>
+            ) : null}
+          </View>
+          <Feather name={showFilters ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} />
+        </Pressable>
+
+        {showFilters ? (
+          <FilterBar
+            filters={filters}
+            onFilterChange={setFilters}
+            memberOptions={members.map((m) => ({ id: m.id, name: m.name }))}
+          />
+        ) : null}
+
+        {filteredTasks.length === 0 && !isLoading ? (
           <EmptyState
-            title="No Tasks Yet"
-            message="Tap the record button below to capture your first home maintenance task"
+            title={activeFilterCount > 0 ? "No Matching Tasks" : "No Tasks Yet"}
+            message={
+              activeFilterCount > 0
+                ? "Try adjusting your filters to see more tasks"
+                : "Tap the record button below to capture your first home maintenance task"
+            }
           />
         ) : (
-          <View style={[styles.tableContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-            <View style={[styles.headerRow, { borderBottomColor: theme.border }]}>
-              <Pressable style={styles.titleColumn} onPress={() => handleSort("title")}>
-                <View style={styles.headerContent}>
-                  <ThemedText style={[styles.headerText, { color: sortColumn === "title" ? theme.primary : theme.textSecondary }]}>
-                    Task
-                  </ThemedText>
-                  {sortColumn === "title" ? (
-                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
-                  ) : null}
-                </View>
-              </Pressable>
-              <Pressable style={styles.chipColumn} onPress={() => handleSort("location")}>
-                <View style={styles.headerContent}>
-                  <ThemedText style={[styles.headerText, { color: sortColumn === "location" ? theme.primary : theme.textSecondary }]}>
-                    Loc
-                  </ThemedText>
-                  {sortColumn === "location" ? (
-                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
-                  ) : null}
-                </View>
-              </Pressable>
-              <Pressable style={styles.chipColumn} onPress={() => handleSort("priority")}>
-                <View style={styles.headerContent}>
-                  <ThemedText style={[styles.headerText, { color: sortColumn === "priority" ? theme.primary : theme.textSecondary }]}>
-                    Pri
-                  </ThemedText>
-                  {sortColumn === "priority" ? (
-                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
-                  ) : null}
-                </View>
-              </Pressable>
-              <Pressable style={styles.smallColumn} onPress={() => handleSort("effort")}>
-                <View style={styles.headerContent}>
-                  <ThemedText style={[styles.headerText, { color: sortColumn === "effort" ? theme.primary : theme.textSecondary }]}>
-                    Eff
-                  </ThemedText>
-                  {sortColumn === "effort" ? (
-                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
-                  ) : null}
-                </View>
-              </Pressable>
-              <Pressable style={styles.chipColumn} onPress={() => handleSort("status")}>
-                <View style={styles.headerContent}>
-                  <ThemedText style={[styles.headerText, { color: sortColumn === "status" ? theme.primary : theme.textSecondary }]}>
-                    Status
-                  </ThemedText>
-                  {sortColumn === "status" ? (
-                    <Feather name={sortDirection === "asc" ? "chevron-up" : "chevron-down"} size={10} color={theme.primary} />
-                  ) : null}
-                </View>
-              </Pressable>
-              <View style={styles.assigneeColumn}>
-                <ThemedText style={[styles.headerText, { color: theme.textSecondary }]}>
-                  Who
-                </ThemedText>
-              </View>
-            </View>
-
-            {sortedTasks.map((task, index) => (
-              <View
-                key={task.id}
-                style={[
-                  styles.taskRow,
-                  index < sortedTasks.length - 1 && {
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.border,
-                  },
-                ]}
-              >
-                <Pressable
-                  style={styles.titleColumn}
-                  onPress={() => handleTaskPress(task)}
-                  testID={`task-row-${task.id}`}
-                >
-                  <View style={styles.titleContent}>
-                    <Feather
-                      name="chevron-right"
-                      size={16}
-                      color={theme.textSecondary}
-                      style={styles.chevron}
-                    />
-                    <ThemedText
-                      style={[
-                        styles.taskTitle,
-                        task.status === "Completed" && styles.completedTitle,
-                      ]}
-                      numberOfLines={2}
-                    >
-                      {task.title}
-                    </ThemedText>
-                  </View>
-                </Pressable>
-
-                <View style={styles.chipColumn}>
-                  <Chip
-                    label={task.location}
-                    variant="muted"
-                    onPress={() => openPicker(task, "location")}
-                    testID={`chip-location-${task.id}`}
-                  />
-                </View>
-
-                <View style={styles.chipColumn}>
-                  <Chip
-                    label={task.priority}
-                    variant={getChipVariantForPriority(task.priority)}
-                    onPress={() => openPicker(task, "priority")}
-                    testID={`chip-priority-${task.id}`}
-                  />
-                </View>
-
-                <View style={styles.smallColumn}>
-                  <Chip
-                    label={getEffortLabel(task.effortScore)}
-                    variant={getChipVariantForEffort(task.effortScore)}
-                    onPress={() => openPicker(task, "effort")}
-                    testID={`chip-effort-${task.id}`}
-                  />
-                </View>
-
-                <View style={styles.chipColumn}>
-                  <Chip
-                    label={task.status}
-                    variant={getChipVariantForStatus(task.status)}
-                    onPress={() => openPicker(task, "status")}
-                    testID={`chip-status-${task.id}`}
-                  />
-                </View>
-                <View style={styles.assigneeColumn}>
-                  <Pressable onPress={() => openPicker(task, "assignee")}>
-                    <View style={[styles.assigneeAvatar, { backgroundColor: task.assignedToId ? theme.primary + "20" : theme.backgroundSecondary }]}>
-                      <ThemedText style={[styles.assigneeInitials, { color: task.assignedToId ? theme.primary : theme.textSecondary }]}>
-                        {task.assignedToId && membersMap[task.assignedToId] 
-                          ? membersMap[task.assignedToId].charAt(0).toUpperCase()
-                          : "?"}
-                      </ThemedText>
-                    </View>
-                  </Pressable>
-                </View>
-              </View>
-            ))}
-          </View>
+          filteredTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              assigneeName={task.assignedToId ? membersMap[task.assignedToId] : undefined}
+              onPress={() => handleTaskPress(task)}
+              onPropertyPress={(propertyType) => openPicker(task, propertyType)}
+            />
+          ))
         )}
       </ScrollView>
 
@@ -416,82 +296,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     flexGrow: 1,
   },
-  tableContainer: {
+  filterToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    overflow: "hidden",
+    marginBottom: Spacing.md,
   },
-  headerRow: {
+  filterToggleLeft: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: Spacing.sm,
-    borderBottomWidth: 1,
+    gap: Spacing.sm,
   },
-  headerText: {
-    fontSize: 9,
-    lineHeight: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-  taskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: Spacing.sm,
-    minHeight: 40,
-  },
-  titleColumn: {
-    flex: 1.5,
-    paddingRight: 4,
-  },
-  titleContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  chevron: {
-    marginRight: 2,
-    opacity: 0.5,
-  },
-  taskTitle: {
-    fontSize: 12,
-    lineHeight: 16,
+  filterToggleText: {
+    fontSize: 14,
     fontWeight: "500",
-    flex: 1,
   },
-  completedTitle: {
-    textDecorationLine: "line-through",
-    opacity: 0.6,
-  },
-  chipColumn: {
-    flex: 0.8,
-    alignItems: "flex-start",
-    paddingHorizontal: 2,
-  },
-  smallColumn: {
-    width: 32,
+  filterBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    minWidth: 20,
     alignItems: "center",
-    paddingHorizontal: 2,
   },
-  assigneeColumn: {
-    width: 32,
-    alignItems: "center",
-    paddingHorizontal: 2,
-  },
-  assigneeAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  assigneeInitials: {
+  filterBadgeText: {
+    color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "600",
   },

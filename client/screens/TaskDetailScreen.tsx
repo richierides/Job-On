@@ -54,6 +54,9 @@ export default function TaskDetailScreen() {
   const [location, setLocation] = useState<Location>(initialTask.location as Location);
   const [priority, setPriority] = useState<Priority>(initialTask.priority as Priority);
   const [status, setStatus] = useState(initialTask.status);
+  const [completedAt, setCompletedAt] = useState<Date | null>(
+    initialTask.completedAt ? new Date(initialTask.completedAt) : null
+  );
   const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   const updateMutation = useMutation({
@@ -82,9 +85,11 @@ export default function TaskDetailScreen() {
 
   const handleToggleStatus = useCallback(async () => {
     const newStatus = status === "Pending" ? "Completed" : "Pending";
+    const newCompletedAt = newStatus === "Completed" ? new Date() : null;
     setStatus(newStatus);
+    setCompletedAt(newCompletedAt);
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    updateMutation.mutate({ status: newStatus });
+    updateMutation.mutate({ status: newStatus, completedAt: newCompletedAt });
   }, [status, updateMutation]);
 
   const handleDelete = useCallback(() => {
@@ -315,6 +320,44 @@ export default function TaskDetailScreen() {
         </Pressable>
       </View>
 
+      {/* Completion Date */}
+      {completedAt ? (
+        <View style={styles.section}>
+          <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+            Completed On
+          </ThemedText>
+          <View style={[styles.dateContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+            <Feather name="check-circle" size={18} color={AppColors.success} />
+            <ThemedText style={styles.dateText}>
+              {completedAt.toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </ThemedText>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Created Date */}
+      <View style={styles.section}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          Created On
+        </ThemedText>
+        <View style={[styles.dateContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <Feather name="calendar" size={18} color={theme.textSecondary} />
+          <ThemedText style={[styles.dateText, { color: theme.textSecondary }]}>
+            {new Date(initialTask.createdAt).toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </ThemedText>
+        </View>
+      </View>
+
       {/* Transcript */}
       {initialTask.transcript ? (
         <View style={styles.section}>
@@ -466,6 +509,17 @@ const styles = StyleSheet.create({
     fontSize: Typography.small.fontSize,
     lineHeight: 22,
     fontStyle: "italic",
+  },
+  dateContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xs,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  dateText: {
+    fontSize: Typography.body.fontSize,
   },
   deleteButton: {
     flexDirection: "row",
