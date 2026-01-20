@@ -16,8 +16,8 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: TanStack React Query for server state synchronization
 - **Styling**: Custom theme system with light/dark mode support, no Tailwind/NativeWind
 - **Animations**: React Native Reanimated for smooth gesture and UI animations
-- **Key Screens**: Task Dashboard (Notion-style table with inline editing), Recording Modal (camera capture), Task Detail (edit), Settings
-- **Components**: Chip (color-coded property badges), PropertyPicker (bottom sheet for inline editing)
+- **Key Screens**: Task Dashboard (card-based layout with filtering), Recording Modal (camera capture), Task Detail (edit with completion tracking), Settings
+- **Components**: TaskCard (large task cards with thumbnail, chips, footer), FilterBar (expandable filter panel), Chip (color-coded property badges), PropertyPicker (bottom sheet for inline editing)
 
 ### Backend Architecture
 - **Framework**: Express.js with TypeScript
@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
 - **Main Tables**:
   - `households` - Household groups with 6-character invite codes for sharing
   - `householdMembers` - Members of households (name only, no authentication required)
-  - `tasks` - Job cards with title, location, priority, effort score, status, householdId, assignedToId
+  - `tasks` - Job cards with title, location, priority, effort score, status, householdId, assignedToId, completedAt
 - **Migrations**: Managed via `drizzle-kit push`
 
 ### Household System (No Auth)
