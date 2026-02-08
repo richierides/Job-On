@@ -83,6 +83,10 @@ Preferred communication style: Simple, everyday language.
 - Materials List tab: Dashboard has Tasks/Materials List tabs; Materials List aggregates shopping items across all tasks with task attribution
 - Plan My Work: Chat-based AI planning assistant (PlanScreen) with split layout - scrollable plan area above, chat input anchored at bottom. Backend POST /api/plan/chat endpoint uses GPT-4o to generate structured weekly plans. AI asks 2-3 setup questions (start date, availability per person) then generates collapsible week-by-week plan cards with task assignments, time estimates, and day scheduling. Users can refine plans through follow-up chat messages.
 - Plan screen split-panel: Plan and chat are now in separate independently-scrollable panels. Top panel shows the generated plan (or empty state), bottom panel shows chat conversation. Both visible simultaneously so the plan stays in view while chatting.
+- Expandable plan tasks: Each task in a generated plan can be tapped to reveal full details (location, priority, effort score, subtasks with progress bar, shopping list) by matching to actual task data.
+- Save Plan: "Save Plan" button appears in plan panel header when a plan is generated. Saves to `saved_plans` table via POST /api/plans. Button changes to "Saved" with checkmark after saving.
+- Saved Plans screen: Accessible from dashboard via archive icon button next to "Plan My Work". Shows saved plans with week/task breakdowns, stats (weeks, tasks, total time), and delete functionality (DELETE /api/plans/:id).
+- Keyboard dismiss: Swiping down the chat panel in Plan screen dismisses the keyboard; tapping the chat ribbon reopens the panel.
 
 ## Roadmap (Upcoming Features)
 - Task dependencies (tag tasks that depend on others)
