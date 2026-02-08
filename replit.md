@@ -80,6 +80,7 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 - Recording overlay: "What to mention" bullet points displayed over camera view, fades out during recording
 - Materials List tab: Dashboard has Tasks/Materials List tabs; Materials List aggregates shopping items across all tasks with task attribution
+- Plan My Work: Chat-based AI planning assistant (PlanScreen) with split layout - scrollable plan area above, chat input anchored at bottom. Backend POST /api/plan/chat endpoint uses GPT-4o to generate structured weekly plans. AI asks 2-3 setup questions (start date, availability per person) then generates collapsible week-by-week plan cards with task assignments, time estimates, and day scheduling. Users can refine plans through follow-up chat messages.
 
 ## Roadmap (Upcoming Features)
 - Task dependencies (tag tasks that depend on others)
