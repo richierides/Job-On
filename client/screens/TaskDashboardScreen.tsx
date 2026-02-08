@@ -41,6 +41,7 @@ export default function TaskDashboardScreen() {
   const queryClient = useQueryClient();
   const { session } = useUserSession();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"tasks" | "materials">("tasks");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     status: null,
@@ -112,6 +113,23 @@ export default function TaskDashboardScreen() {
   const activeFilterCount = useMemo(() => {
     return [filters.status, filters.priority, filters.location, filters.assignedToId].filter(Boolean).length;
   }, [filters]);
+
+  const aggregatedMaterials = useMemo(() => {
+    const items: { item: string; checked: boolean; taskId: number; taskTitle: string }[] = [];
+    tasks.forEach((task) => {
+      if (task.shoppingList && Array.isArray(task.shoppingList)) {
+        task.shoppingList.forEach((entry) => {
+          items.push({
+            item: entry.item,
+            checked: entry.checked,
+            taskId: task.id,
+            taskTitle: task.title,
+          });
+        });
+      }
+    });
+    return items;
+  }, [tasks]);
 
   const handleRecordPress = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -247,25 +265,98 @@ export default function TaskDashboardScreen() {
           />
         ) : null}
 
-        {filteredTasks.length === 0 && !isLoading ? (
+        <View style={[styles.tabRow, { borderColor: theme.border }]}>
+          <Pressable
+            style={[
+              styles.tab,
+              activeTab === "tasks" ? [styles.tabActive, { borderBottomColor: theme.primary }] : null,
+            ]}
+            onPress={() => setActiveTab("tasks")}
+            testID="tab-tasks"
+          >
+            <ThemedText
+              style={[
+                styles.tabText,
+                { color: activeTab === "tasks" ? theme.primary : theme.textSecondary },
+              ]}
+            >
+              Tasks
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.tab,
+              activeTab === "materials" ? [styles.tabActive, { borderBottomColor: theme.primary }] : null,
+            ]}
+            onPress={() => setActiveTab("materials")}
+            testID="tab-materials"
+          >
+            <ThemedText
+              style={[
+                styles.tabText,
+                { color: activeTab === "materials" ? theme.primary : theme.textSecondary },
+              ]}
+            >
+              Materials List
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        {activeTab === "tasks" ? (
+          filteredTasks.length === 0 && !isLoading ? (
+            <EmptyState
+              title={activeFilterCount > 0 ? "No Matching Tasks" : "No Tasks Yet"}
+              message={
+                activeFilterCount > 0
+                  ? "Try adjusting your filters to see more tasks"
+                  : "Tap the record button below to capture your first home maintenance task"
+              }
+            />
+          ) : (
+            filteredTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                assigneeName={task.assignedToId ? membersMap[task.assignedToId] : undefined}
+                onPress={() => handleTaskPress(task)}
+                onPropertyPress={(propertyType) => openPicker(task, propertyType)}
+              />
+            ))
+          )
+        ) : aggregatedMaterials.length === 0 ? (
           <EmptyState
-            title={activeFilterCount > 0 ? "No Matching Tasks" : "No Tasks Yet"}
-            message={
-              activeFilterCount > 0
-                ? "Try adjusting your filters to see more tasks"
-                : "Tap the record button below to capture your first home maintenance task"
-            }
+            title="No Materials Yet"
+            message="Materials mentioned in your task recordings will appear here"
           />
         ) : (
-          filteredTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              assigneeName={task.assignedToId ? membersMap[task.assignedToId] : undefined}
-              onPress={() => handleTaskPress(task)}
-              onPropertyPress={(propertyType) => openPicker(task, propertyType)}
-            />
-          ))
+          <View style={styles.materialsContainer}>
+            {aggregatedMaterials.map((mat, index) => (
+              <Pressable
+                key={`${mat.taskId}-${index}`}
+                style={[styles.materialRow, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}
+                onPress={() => {
+                  const task = tasks.find((t) => t.id === mat.taskId);
+                  if (task) handleTaskPress(task);
+                }}
+                testID={`material-item-${index}`}
+              >
+                <Feather
+                  name={mat.checked ? "check-square" : "square"}
+                  size={20}
+                  color={mat.checked ? AppColors.success : theme.textSecondary}
+                />
+                <View style={styles.materialInfo}>
+                  <ThemedText style={[styles.materialName, mat.checked ? styles.materialChecked : null]}>
+                    {mat.item}
+                  </ThemedText>
+                  <ThemedText style={[styles.materialTask, { color: theme.textSecondary }]}>
+                    {mat.taskTitle}
+                  </ThemedText>
+                </View>
+                <Feather name="chevron-right" size={16} color={theme.textSecondary} />
+              </Pressable>
+            ))}
+          </View>
         )}
       </ScrollView>
 
@@ -326,5 +417,51 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "600",
+  },
+  tabRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  tab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: Spacing.sm + 2,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabActive: {
+    borderBottomWidth: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  materialsContainer: {
+    gap: Spacing.sm,
+  },
+  materialRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.md,
+  },
+  materialInfo: {
+    flex: 1,
+  },
+  materialName: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  materialChecked: {
+    textDecorationLine: "line-through",
+    opacity: 0.6,
+  },
+  materialTask: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });
