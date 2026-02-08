@@ -8,11 +8,13 @@ import {
   ActivityIndicator,
   LayoutChangeEvent,
   Platform,
+  Keyboard,
+  Alert,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -82,11 +84,30 @@ function formatMinutes(mins: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+function findMatchingTask(taskTitle: string, tasks: Task[]): Task | null {
+  const normalized = taskTitle.toLowerCase().trim();
+  return tasks.find((t) => t.title.toLowerCase().trim() === normalized) || null;
+}
+
+function getPriorityColor(priority: string): string {
+  switch (priority) {
+    case "High":
+      return AppColors.error;
+    case "Medium":
+      return AppColors.warning;
+    case "Low":
+      return AppColors.success;
+    default:
+      return AppColors.primary;
+  }
+}
+
 export default function PlanScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const { session } = useUserSession();
+  const queryClient = useQueryClient();
   const chatScrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -95,7 +116,9 @@ export default function PlanScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Record<number, boolean>>({});
+  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [containerHeight, setContainerHeight] = useState(600);
+  const [isSaved, setIsSaved] = useState(false);
 
   const chatFraction = useSharedValue(0.5);
   const savedFraction = useSharedValue(0.5);
@@ -108,6 +131,10 @@ export default function PlanScreen() {
 
   const triggerHaptic = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
   }, []);
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
@@ -130,6 +157,7 @@ export default function PlanScreen() {
         chatFraction.value = withSpring(minChatFraction, SPRING_CONFIG);
         isMinimized.value = true;
         runOnJS(triggerHaptic)();
+        runOnJS(dismissKeyboard)();
       } else if (e.translationY < -MINIMIZE_THRESHOLD && isMinimized.value) {
         chatFraction.value = withSpring(0.5, SPRING_CONFIG);
         isMinimized.value = false;
@@ -138,6 +166,9 @@ export default function PlanScreen() {
         const snapTo = chatFraction.value < 0.1 ? minChatFraction : chatFraction.value;
         chatFraction.value = withSpring(snapTo, SPRING_CONFIG);
         isMinimized.value = snapTo < 0.1;
+        if (snapTo < 0.1) {
+          runOnJS(dismissKeyboard)();
+        }
       }
     });
 
@@ -201,6 +232,21 @@ export default function PlanScreen() {
     [tasksList]
   );
 
+  const savePlanMutation = useMutation({
+    mutationFn: async (planData: Plan) => {
+      return apiRequest("POST", "/api/plans", {
+        householdId: session.householdId,
+        name: `Plan - ${new Date().toLocaleDateString()}`,
+        planData,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plans"] });
+      setIsSaved(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+  });
+
   useEffect(() => {
     if (messages.length === 0 && pendingTasks.length >= 0) {
       const greeting: ChatMessage = {
@@ -251,11 +297,13 @@ export default function PlanScreen() {
       const parsedPlan = parsePlanFromMessage(reply);
       if (parsedPlan) {
         setPlan(parsedPlan);
+        setIsSaved(false);
         const expanded: Record<number, boolean> = {};
         parsedPlan.weeks.forEach((w) => {
           expanded[w.weekNumber] = true;
         });
         setExpandedWeeks(expanded);
+        setExpandedTasks({});
       }
     } catch (error) {
       console.error("Plan chat error:", error);
@@ -282,6 +330,102 @@ export default function PlanScreen() {
     }));
   }, []);
 
+  const toggleTaskDetail = useCallback((key: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExpandedTasks((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  }, []);
+
+  const handleSavePlan = useCallback(() => {
+    if (!plan || isSaved) return;
+    savePlanMutation.mutate(plan);
+  }, [plan, isSaved, savePlanMutation]);
+
+  const renderTaskDetail = (matchedTask: Task) => {
+    const subtasks = (matchedTask.subtasks as any[] | null) || [];
+    const shoppingList = (matchedTask.shoppingList as any[] | null) || [];
+    const completedSubtasks = subtasks.filter((s) => s.completed).length;
+    const totalSubtasks = subtasks.length;
+    const progress = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
+
+    return (
+      <View style={[styles.taskDetailContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+        <View style={styles.detailRow}>
+          <View style={styles.detailItem}>
+            <Feather name="map-pin" size={12} color={theme.textSecondary} />
+            <ThemedText style={[styles.detailLabel, { color: theme.textSecondary }]}>
+              {matchedTask.location}
+            </ThemedText>
+          </View>
+          <View style={styles.detailItem}>
+            <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(matchedTask.priority) }]} />
+            <ThemedText style={[styles.detailLabel, { color: theme.textSecondary }]}>
+              {matchedTask.priority}
+            </ThemedText>
+          </View>
+          <View style={styles.detailItem}>
+            <Feather name="zap" size={12} color={theme.textSecondary} />
+            <ThemedText style={[styles.detailLabel, { color: theme.textSecondary }]}>
+              Effort {matchedTask.effortScore}/5
+            </ThemedText>
+          </View>
+        </View>
+
+        {totalSubtasks > 0 ? (
+          <View style={styles.subtasksSection}>
+            <View style={styles.subtasksHeader}>
+              <ThemedText style={[styles.subtasksSectionTitle, { color: theme.text }]}>
+                Subtasks ({completedSubtasks}/{totalSubtasks})
+              </ThemedText>
+              <View style={[styles.progressBar, { backgroundColor: theme.backgroundTertiary }]}>
+                <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: AppColors.success }]} />
+              </View>
+              <ThemedText style={[styles.progressText, { color: theme.textSecondary }]}>
+                {progress}%
+              </ThemedText>
+            </View>
+            {subtasks.map((sub: any, idx: number) => (
+              <View key={idx} style={styles.subtaskRow}>
+                <Feather
+                  name={sub.completed ? "check-square" : "square"}
+                  size={14}
+                  color={sub.completed ? AppColors.success : theme.textSecondary}
+                />
+                <ThemedText
+                  style={[
+                    styles.subtaskText,
+                    { color: sub.completed ? theme.textSecondary : theme.text },
+                    sub.completed ? styles.subtaskCompleted : null,
+                  ]}
+                >
+                  {sub.title}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {shoppingList.length > 0 ? (
+          <View style={styles.shoppingSection}>
+            <ThemedText style={[styles.subtasksSectionTitle, { color: theme.text }]}>
+              Materials Needed
+            </ThemedText>
+            {shoppingList.map((item: any, idx: number) => (
+              <View key={idx} style={styles.subtaskRow}>
+                <Feather name="shopping-bag" size={14} color={theme.textSecondary} />
+                <ThemedText style={[styles.subtaskText, { color: theme.text }]}>
+                  {item.item}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
   const renderPlanPanel = () => {
     if (!plan) {
       return (
@@ -306,10 +450,35 @@ export default function PlanScreen() {
         testID="plan-scroll-area"
       >
         <View style={styles.planHeaderRow}>
-          <Feather name="calendar" size={18} color={theme.primary} />
-          <ThemedText style={[styles.planTitle, { color: theme.text }]}>
-            Your Plan
-          </ThemedText>
+          <View style={styles.planHeaderLeft}>
+            <Feather name="calendar" size={18} color={theme.primary} />
+            <ThemedText style={[styles.planTitle, { color: theme.text }]}>
+              Your Plan
+            </ThemedText>
+          </View>
+          <Pressable
+            style={[
+              styles.savePlanButton,
+              {
+                backgroundColor: isSaved ? AppColors.success : theme.primary,
+                opacity: savePlanMutation.isPending ? 0.6 : 1,
+              },
+            ]}
+            onPress={handleSavePlan}
+            disabled={isSaved || savePlanMutation.isPending}
+            testID="button-save-plan"
+          >
+            {savePlanMutation.isPending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Feather name={isSaved ? "check" : "save"} size={14} color="#FFFFFF" />
+                <ThemedText style={styles.savePlanText}>
+                  {isSaved ? "Saved" : "Save Plan"}
+                </ThemedText>
+              </>
+            )}
+          </Pressable>
         </View>
 
         {plan.weeks.map((week) => {
@@ -338,41 +507,61 @@ export default function PlanScreen() {
 
               {isExpanded ? (
                 <View style={styles.weekTasks}>
-                  {week.tasks.map((task, idx) => (
-                    <View
-                      key={idx}
-                      style={[styles.taskRow, { backgroundColor: theme.backgroundSecondary }]}
-                    >
-                      <View style={styles.taskRowLeft}>
-                        <Feather name="check-circle" size={16} color={theme.textSecondary} />
-                        <View style={styles.taskInfo}>
-                          <ThemedText style={[styles.taskName, { color: theme.text }]}>
-                            {task.taskTitle}
-                          </ThemedText>
-                          <View style={styles.taskMeta}>
-                            {task.day ? (
-                              <View style={[styles.chip, { backgroundColor: theme.backgroundTertiary }]}>
-                                <ThemedText style={[styles.chipText, { color: theme.textSecondary }]}>
-                                  {task.day}
-                                </ThemedText>
+                  {week.tasks.map((task, idx) => {
+                    const taskKey = `${week.weekNumber}-${idx}`;
+                    const isTaskExpanded = expandedTasks[taskKey] === true;
+                    const matchedTask = findMatchingTask(task.taskTitle, tasksList);
+
+                    return (
+                      <View key={idx}>
+                        <Pressable
+                          style={[styles.taskRow, { backgroundColor: theme.backgroundSecondary }]}
+                          onPress={matchedTask ? () => toggleTaskDetail(taskKey) : undefined}
+                          testID={`plan-task-${week.weekNumber}-${idx}`}
+                        >
+                          <View style={styles.taskRowLeft}>
+                            <Feather name="check-circle" size={16} color={theme.textSecondary} />
+                            <View style={styles.taskInfo}>
+                              <ThemedText style={[styles.taskName, { color: theme.text }]}>
+                                {task.taskTitle}
+                              </ThemedText>
+                              <View style={styles.taskMeta}>
+                                {task.day ? (
+                                  <View style={[styles.chip, { backgroundColor: theme.backgroundTertiary }]}>
+                                    <ThemedText style={[styles.chipText, { color: theme.textSecondary }]}>
+                                      {task.day}
+                                    </ThemedText>
+                                  </View>
+                                ) : null}
+                                {task.assignee ? (
+                                  <View style={[styles.chip, { backgroundColor: theme.backgroundTertiary }]}>
+                                    <Feather name="user" size={10} color={theme.textSecondary} />
+                                    <ThemedText style={[styles.chipText, { color: theme.textSecondary }]}>
+                                      {task.assignee}
+                                    </ThemedText>
+                                  </View>
+                                ) : null}
                               </View>
-                            ) : null}
-                            {task.assignee ? (
-                              <View style={[styles.chip, { backgroundColor: theme.backgroundTertiary }]}>
-                                <Feather name="user" size={10} color={theme.textSecondary} />
-                                <ThemedText style={[styles.chipText, { color: theme.textSecondary }]}>
-                                  {task.assignee}
-                                </ThemedText>
-                              </View>
+                            </View>
+                          </View>
+                          <View style={styles.taskRowRight}>
+                            <ThemedText style={[styles.taskTime, { color: theme.textSecondary }]}>
+                              {formatMinutes(task.estimatedMinutes)}
+                            </ThemedText>
+                            {matchedTask ? (
+                              <Feather
+                                name={isTaskExpanded ? "chevron-up" : "chevron-down"}
+                                size={14}
+                                color={theme.textSecondary}
+                              />
                             ) : null}
                           </View>
-                        </View>
+                        </Pressable>
+
+                        {isTaskExpanded && matchedTask ? renderTaskDetail(matchedTask) : null}
                       </View>
-                      <ThemedText style={[styles.taskTime, { color: theme.textSecondary }]}>
-                        {formatMinutes(task.estimatedMinutes)}
-                      </ThemedText>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               ) : null}
             </View>
@@ -561,12 +750,30 @@ const styles = StyleSheet.create({
   planHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    justifyContent: "space-between",
     marginBottom: Spacing.sm,
+  },
+  planHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
   },
   planTitle: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  savePlanButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+  },
+  savePlanText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   weekSection: {
     borderTopWidth: 1,
@@ -610,6 +817,11 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     flex: 1,
   },
+  taskRowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
   taskInfo: {
     flex: 1,
   },
@@ -638,7 +850,78 @@ const styles = StyleSheet.create({
   taskTime: {
     fontSize: 13,
     fontWeight: "500",
-    marginLeft: Spacing.sm,
+  },
+  taskDetailContainer: {
+    marginTop: 2,
+    marginHorizontal: 4,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  detailRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.md,
+  },
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  priorityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  subtasksSection: {
+    gap: 4,
+  },
+  subtasksHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: 2,
+  },
+  subtasksSectionTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  progressBar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  progressText: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  subtaskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingVertical: 2,
+    paddingLeft: 2,
+  },
+  subtaskText: {
+    fontSize: 12,
+    flex: 1,
+  },
+  subtaskCompleted: {
+    textDecorationLine: "line-through",
+    opacity: 0.6,
+  },
+  shoppingSection: {
+    gap: 4,
   },
   chatPanelAnimated: {
     overflow: "hidden",

@@ -302,20 +302,32 @@ export default function TaskDashboardScreen() {
           </Pressable>
         </View>
 
-        <Pressable
-          style={[styles.planButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.primary }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            navigation.navigate("Plan");
-          }}
-          testID="button-plan-my-work"
-        >
-          <Feather name="calendar" size={18} color={theme.primary} />
-          <ThemedText style={[styles.planButtonText, { color: theme.primary }]}>
-            Plan My Work
-          </ThemedText>
-          <Feather name="chevron-right" size={16} color={theme.primary} />
-        </Pressable>
+        <View style={styles.planButtonRow}>
+          <Pressable
+            style={[styles.planButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.primary, flex: 1 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              navigation.navigate("Plan");
+            }}
+            testID="button-plan-my-work"
+          >
+            <Feather name="calendar" size={18} color={theme.primary} />
+            <ThemedText style={[styles.planButtonText, { color: theme.primary }]}>
+              Plan My Work
+            </ThemedText>
+            <Feather name="chevron-right" size={16} color={theme.primary} />
+          </Pressable>
+          <Pressable
+            style={[styles.savedPlansButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              navigation.navigate("SavedPlans");
+            }}
+            testID="button-saved-plans"
+          >
+            <Feather name="archive" size={18} color={theme.textSecondary} />
+          </Pressable>
+        </View>
 
         {activeTab === "tasks" ? (
           filteredTasks.length === 0 && !isLoading ? (
@@ -452,6 +464,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  planButtonRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
   planButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -460,11 +477,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.sm,
     borderWidth: 1.5,
-    marginBottom: Spacing.lg,
   },
   planButtonText: {
     fontSize: 15,
     fontWeight: "600",
+  },
+  savedPlansButton: {
+    width: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
   },
   materialsContainer: {
     gap: Spacing.sm,
