@@ -8,6 +8,7 @@ import TaskDetailScreen from "@/screens/TaskDetailScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import RecordingModal from "@/screens/RecordingModal";
 import OnboardingScreen from "@/screens/OnboardingScreen";
+import PlanScreen from "@/screens/PlanScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   TaskDetail: { task: Task };
   Settings: undefined;
   Recording: undefined;
+  Plan: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -74,6 +76,13 @@ export default function RootStackNavigator() {
             component={SettingsScreen}
             options={{
               headerTitle: "Settings",
+            }}
+          />
+          <Stack.Screen
+            name="Plan"
+            component={PlanScreen}
+            options={{
+              headerTitle: "Plan My Work",
             }}
           />
           <Stack.Screen

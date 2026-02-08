@@ -302,6 +302,21 @@ export default function TaskDashboardScreen() {
           </Pressable>
         </View>
 
+        <Pressable
+          style={[styles.planButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.primary }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            navigation.navigate("Plan");
+          }}
+          testID="button-plan-my-work"
+        >
+          <Feather name="calendar" size={18} color={theme.primary} />
+          <ThemedText style={[styles.planButtonText, { color: theme.primary }]}>
+            Plan My Work
+          </ThemedText>
+          <Feather name="chevron-right" size={16} color={theme.primary} />
+        </Pressable>
+
         {activeTab === "tasks" ? (
           filteredTasks.length === 0 && !isLoading ? (
             <EmptyState
@@ -435,6 +450,20 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
+    fontWeight: "600",
+  },
+  planButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1.5,
+    marginBottom: Spacing.lg,
+  },
+  planButtonText: {
+    fontSize: 15,
     fontWeight: "600",
   },
   materialsContainer: {
