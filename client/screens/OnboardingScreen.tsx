@@ -27,7 +27,7 @@ const FontSizes = {
   xl: 24,
 };
 
-type OnboardingStep = "choice" | "create" | "join" | "name";
+type OnboardingStep = "choice" | "create" | "join" | "name" | "login";
 
 export default function OnboardingScreen() {
   const { theme } = useTheme();
@@ -38,6 +38,8 @@ export default function OnboardingScreen() {
   const [householdName, setHouseholdName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [memberName, setMemberName] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingHousehold, setPendingHousehold] = useState<Household | null>(null);
@@ -115,12 +117,43 @@ export default function OnboardingScreen() {
     }
   };
 
+  const handleLogin = async () => {
+    if (!loginEmail.trim()) {
+      setError("Please enter your email");
+      return;
+    }
+    if (!loginPassword) {
+      setError("Please enter your password");
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiRequest("POST", "/api/auth/login", {
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+      const data = await response.json();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await setSession({
+        memberId: data.member.id,
+        memberName: data.member.name,
+        householdId: data.member.householdId,
+        householdName: data.household?.name || "My Household",
+        inviteCode: data.household?.inviteCode || null,
+      });
+    } catch (err: any) {
+      setError("Invalid email or password. Please try again.");
+      setIsLoading(false);
+    }
+  };
+
   const goBack = () => {
     setError(null);
     if (step === "name") {
       setPendingHousehold(null);
       setStep("choice");
-    } else if (step === "create" || step === "join") {
+    } else if (step === "create" || step === "join" || step === "login") {
       setStep("choice");
     }
   };
@@ -152,6 +185,19 @@ export default function OnboardingScreen() {
           <ThemedText style={[styles.secondaryButtonText, { color: theme.text }]}>Join with Invite Code</ThemedText>
         </Pressable>
       </View>
+
+      <Pressable
+        style={styles.signInLink}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStep("login"); }}
+        testID="button-sign-in"
+      >
+        <ThemedText style={[styles.signInText, { color: theme.textSecondary }]}>
+          Already have an account?{" "}
+        </ThemedText>
+        <ThemedText style={[styles.signInTextBold, { color: theme.primary }]}>
+          Sign In
+        </ThemedText>
+      </Pressable>
     </View>
   );
 
@@ -283,6 +329,64 @@ export default function OnboardingScreen() {
     </View>
   );
 
+  const renderLogin = () => (
+    <View style={styles.content}>
+      <Pressable style={styles.backButton} onPress={goBack}>
+        <Feather name="arrow-left" size={24} color={theme.text} />
+      </Pressable>
+
+      <View style={styles.header}>
+        <Feather name="log-in" size={40} color={theme.primary} />
+        <ThemedText style={[styles.title, { color: theme.text }]}>Welcome Back</ThemedText>
+        <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+          Sign in to access your household and tasks
+        </ThemedText>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <TextInput
+          testID="input-login-email"
+          style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border, marginBottom: Spacing.sm }]}
+          placeholder="Email address"
+          placeholderTextColor={theme.textSecondary}
+          value={loginEmail}
+          onChangeText={setLoginEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          autoFocus
+        />
+        <TextInput
+          testID="input-login-password"
+          style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+          placeholder="Password"
+          placeholderTextColor={theme.textSecondary}
+          value={loginPassword}
+          onChangeText={setLoginPassword}
+          secureTextEntry
+          autoComplete="current-password"
+        />
+        {error ? <ThemedText style={[styles.errorText, { color: theme.error }]}>{error}</ThemedText> : null}
+      </View>
+
+      <Pressable
+        testID="button-login-submit"
+        style={[styles.primaryButton, { backgroundColor: theme.primary, opacity: isLoading ? 0.6 : 1 }]}
+        onPress={handleLogin}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <>
+            <Feather name="log-in" size={20} color="#FFFFFF" />
+            <ThemedText style={styles.primaryButtonText}>Sign In</ThemedText>
+          </>
+        )}
+      </Pressable>
+    </View>
+  );
+
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl }]}>
       <KeyboardAvoidingView
@@ -294,6 +398,7 @@ export default function OnboardingScreen() {
           {step === "create" && renderCreate()}
           {step === "join" && renderJoin()}
           {step === "name" && renderName()}
+          {step === "login" && renderLogin()}
         </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>
@@ -389,5 +494,18 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     marginTop: Spacing.sm,
     textAlign: "center",
+  },
+  signInLink: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: Spacing["2xl"],
+  },
+  signInText: {
+    fontSize: FontSizes.sm,
+  },
+  signInTextBold: {
+    fontSize: FontSizes.sm,
+    fontWeight: "600",
   },
 });
