@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  LayoutChangeEvent,
   Platform,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -14,6 +15,14 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+  runOnJS,
+} from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -21,6 +30,10 @@ import { useUserSession } from "@/contexts/UserSessionContext";
 import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
 import { Task, HouseholdMember } from "@shared/schema";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+
+const RIBBON_HEIGHT = 44;
+const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 0.8 };
+const MINIMIZE_THRESHOLD = 60;
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -82,6 +95,81 @@ export default function PlanScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Record<number, boolean>>({});
+  const [containerHeight, setContainerHeight] = useState(600);
+
+  const chatFraction = useSharedValue(0.5);
+  const savedFraction = useSharedValue(0.5);
+  const isMinimized = useSharedValue(false);
+
+  const inputBarHeight = 42 + Spacing.sm + Math.max(insets.bottom, Spacing.sm);
+
+  const maxChatFraction = 0.65;
+  const minChatFraction = 0;
+
+  const triggerHaptic = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
+  const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
+    setContainerHeight(e.nativeEvent.layout.height);
+  }, []);
+
+  const availableHeight = containerHeight - headerHeight - inputBarHeight;
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      savedFraction.value = chatFraction.value;
+    })
+    .onUpdate((e) => {
+      const dragFraction = e.translationY / availableHeight;
+      const newFraction = savedFraction.value - dragFraction;
+      chatFraction.value = Math.max(minChatFraction, Math.min(maxChatFraction, newFraction));
+    })
+    .onEnd((e) => {
+      if (e.translationY > MINIMIZE_THRESHOLD && savedFraction.value > 0.1) {
+        chatFraction.value = withSpring(minChatFraction, SPRING_CONFIG);
+        isMinimized.value = true;
+        runOnJS(triggerHaptic)();
+      } else if (e.translationY < -MINIMIZE_THRESHOLD && isMinimized.value) {
+        chatFraction.value = withSpring(0.5, SPRING_CONFIG);
+        isMinimized.value = false;
+        runOnJS(triggerHaptic)();
+      } else {
+        const snapTo = chatFraction.value < 0.1 ? minChatFraction : chatFraction.value;
+        chatFraction.value = withSpring(snapTo, SPRING_CONFIG);
+        isMinimized.value = snapTo < 0.1;
+      }
+    });
+
+  const tapGesture = Gesture.Tap().onEnd(() => {
+    if (isMinimized.value) {
+      chatFraction.value = withSpring(0.5, SPRING_CONFIG);
+      isMinimized.value = false;
+      runOnJS(triggerHaptic)();
+    }
+  });
+
+  const composedGesture = Gesture.Race(panGesture, tapGesture);
+
+  const chatPanelStyle = useAnimatedStyle(() => {
+    const chatHeight = RIBBON_HEIGHT + chatFraction.value * availableHeight;
+    return {
+      height: chatHeight,
+    };
+  });
+
+  const chatContentOpacity = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(chatFraction.value, [0, 0.15], [0, 1]),
+    };
+  });
+
+  const chevronStyle = useAnimatedStyle(() => {
+    const rotation = interpolate(chatFraction.value, [0, 0.3], [180, 0]);
+    return {
+      transform: [{ rotate: `${rotation}deg` }],
+    };
+  });
 
   const { data: tasksList = [] } = useQuery<Task[]>({
     queryKey: ["/api/tasks", { householdId: session.householdId }],
@@ -329,40 +417,51 @@ export default function PlanScreen() {
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       behavior="padding"
       keyboardVerticalOffset={0}
+      onLayout={onContainerLayout}
     >
-      <View style={[styles.planPanel, { paddingTop: headerHeight + Spacing.sm, backgroundColor: theme.backgroundDefault, borderBottomColor: theme.border }]}>
+      <View style={[styles.planPanel, { paddingTop: headerHeight + Spacing.sm, backgroundColor: theme.backgroundDefault }]}>
         {renderPlanPanel()}
       </View>
 
-      <View style={[styles.chatPanel, { backgroundColor: theme.backgroundRoot }]}>
-        <View style={styles.chatHeaderRow}>
-          <Feather name="message-circle" size={16} color={theme.textSecondary} />
-          <ThemedText style={[styles.chatHeaderText, { color: theme.textSecondary }]}>
-            Chat
-          </ThemedText>
-        </View>
-
-        <ScrollView
-          ref={chatScrollRef}
-          style={styles.chatScroll}
-          contentContainerStyle={styles.chatScrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={true}
-          nestedScrollEnabled={true}
-          testID="chat-scroll-area"
-        >
-          {renderChatMessages()}
-
-          {isLoading ? (
-            <View style={[styles.loadingBubble, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-              <ActivityIndicator size="small" color={theme.primary} />
-              <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
-                Thinking...
+      <Animated.View style={[styles.chatPanelAnimated, { backgroundColor: theme.backgroundRoot, borderTopColor: theme.border }, chatPanelStyle]}>
+        <GestureDetector gesture={composedGesture}>
+          <Animated.View style={[styles.chatRibbon, { backgroundColor: theme.backgroundDefault, borderTopColor: theme.border }]}>
+            <View style={[styles.dragHandle, { backgroundColor: theme.textSecondary }]} />
+            <View style={styles.ribbonContent}>
+              <Feather name="message-circle" size={14} color={theme.textSecondary} />
+              <ThemedText style={[styles.chatHeaderText, { color: theme.textSecondary }]}>
+                Chat
               </ThemedText>
             </View>
-          ) : null}
-        </ScrollView>
-      </View>
+            <Animated.View style={chevronStyle}>
+              <Feather name="chevron-up" size={16} color={theme.textSecondary} />
+            </Animated.View>
+          </Animated.View>
+        </GestureDetector>
+
+        <Animated.View style={[styles.chatBody, chatContentOpacity]}>
+          <ScrollView
+            ref={chatScrollRef}
+            style={styles.chatScroll}
+            contentContainerStyle={styles.chatScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+            testID="chat-scroll-area"
+          >
+            {renderChatMessages()}
+
+            {isLoading ? (
+              <View style={[styles.loadingBubble, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
+                  Thinking...
+                </ThemedText>
+              </View>
+            ) : null}
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
 
       <View
         style={[
@@ -434,7 +533,6 @@ const styles = StyleSheet.create({
   planPanel: {
     flex: 1,
     minHeight: 140,
-    borderBottomWidth: 1,
   },
   planEmptyState: {
     flex: 1,
@@ -542,23 +640,41 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginLeft: Spacing.sm,
   },
-  chatPanel: {
-    flex: 1,
-    minHeight: 160,
+  chatPanelAnimated: {
+    overflow: "hidden",
+    borderTopWidth: 1,
   },
-  chatHeaderRow: {
+  chatRibbon: {
+    height: RIBBON_HEIGHT,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    borderTopWidth: 0,
+  },
+  dragHandle: {
+    position: "absolute",
+    top: 6,
+    left: "50%",
+    marginLeft: -18,
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.4,
+  },
+  ribbonContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xs,
   },
   chatHeaderText: {
     fontSize: 13,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  chatBody: {
+    flex: 1,
   },
   chatScroll: {
     flex: 1,
