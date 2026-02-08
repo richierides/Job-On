@@ -89,6 +89,17 @@ export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type UpdateTask = z.infer<typeof updateTaskSchema>;
 
+// Saved Plans Schema
+export const savedPlans = pgTable("saved_plans", {
+  id: serial("id").primaryKey(),
+  householdId: integer("household_id").notNull(),
+  name: text("name").notNull().default("My Plan"),
+  planData: jsonb("plan_data").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type SavedPlan = typeof savedPlans.$inferSelect;
+
 // Priority and Status types
 export const PRIORITIES = ["Low", "Medium", "High"] as const;
 export const STATUSES = ["Pending", "Completed"] as const;

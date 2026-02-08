@@ -6,7 +6,7 @@ import * as fs from "fs";
 import * as path from "path";
 import bcrypt from "bcryptjs";
 import OpenAI, { toFile } from "openai";
-import { tasks, insertTaskSchema, updateTaskSchema, households, householdMembers, insertHouseholdSchema, insertHouseholdMemberSchema } from "@shared/schema";
+import { tasks, insertTaskSchema, updateTaskSchema, households, householdMembers, insertHouseholdSchema, insertHouseholdMemberSchema, savedPlans } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -495,6 +495,51 @@ Guidelines for planning:
     } catch (error) {
       console.error("Error logging in:", error);
       res.status(500).json({ error: "Failed to log in" });
+    }
+  });
+
+  // ============ Saved Plans Endpoints ============
+
+  app.get("/api/plans", async (req: Request, res: Response) => {
+    try {
+      const householdId = req.query.householdId ? parseInt(req.query.householdId as string) : null;
+      if (!householdId) {
+        return res.status(400).json({ error: "householdId is required" });
+      }
+      const plans = await db.select().from(savedPlans).where(eq(savedPlans.householdId, householdId)).orderBy(desc(savedPlans.createdAt));
+      res.json(plans);
+    } catch (error) {
+      console.error("Error fetching plans:", error);
+      res.status(500).json({ error: "Failed to fetch plans" });
+    }
+  });
+
+  app.post("/api/plans", async (req: Request, res: Response) => {
+    try {
+      const { householdId, name, planData } = req.body;
+      if (!householdId || !planData) {
+        return res.status(400).json({ error: "householdId and planData are required" });
+      }
+      const [newPlan] = await db.insert(savedPlans).values({
+        householdId,
+        name: name || "My Plan",
+        planData,
+      }).returning();
+      res.status(201).json(newPlan);
+    } catch (error) {
+      console.error("Error saving plan:", error);
+      res.status(500).json({ error: "Failed to save plan" });
+    }
+  });
+
+  app.delete("/api/plans/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(savedPlans).where(eq(savedPlans.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting plan:", error);
+      res.status(500).json({ error: "Failed to delete plan" });
     }
   });
 
