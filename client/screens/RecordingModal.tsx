@@ -55,6 +55,11 @@ export default function RecordingModal() {
 
   const pulseScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(1);
+  const hintsOpacity = useSharedValue(1);
+
+  const hintsAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: hintsOpacity.value,
+  }));
 
   const pulseAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
@@ -105,6 +110,7 @@ export default function RecordingModal() {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsRecording(true);
       startPulse();
+      hintsOpacity.value = withTiming(0, { duration: 300 });
 
       setRecordingDuration(0);
       timerRef.current = setInterval(() => {
@@ -133,6 +139,7 @@ export default function RecordingModal() {
       cameraRef.current.stopRecording();
       setIsRecording(false);
       stopPulse();
+      hintsOpacity.value = withTiming(1, { duration: 400 });
 
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -279,6 +286,33 @@ export default function RecordingModal() {
         >
           <Feather name="x" size={24} color="#FFFFFF" />
         </Pressable>
+
+        <Animated.View
+          style={[styles.hintsContainer, { top: insets.top + 60 }, hintsAnimatedStyle]}
+          pointerEvents="none"
+        >
+          <ThemedText style={styles.hintsTitle} lightColor="#FFFFFF" darkColor="#FFFFFF">
+            What to mention:
+          </ThemedText>
+          <ThemedText style={styles.hintsBullet} lightColor="rgba(255,255,255,0.85)" darkColor="rgba(255,255,255,0.85)">
+            {"\u2022"}  Describe the problem
+          </ThemedText>
+          <ThemedText style={styles.hintsBullet} lightColor="rgba(255,255,255,0.85)" darkColor="rgba(255,255,255,0.85)">
+            {"\u2022"}  Where it is
+          </ThemedText>
+          <ThemedText style={styles.hintsBullet} lightColor="rgba(255,255,255,0.85)" darkColor="rgba(255,255,255,0.85)">
+            {"\u2022"}  How urgent it is
+          </ThemedText>
+          <ThemedText style={styles.hintsBullet} lightColor="rgba(255,255,255,0.85)" darkColor="rgba(255,255,255,0.85)">
+            {"\u2022"}  How big a job you think it is
+          </ThemedText>
+          <ThemedText style={styles.hintsBullet} lightColor="rgba(255,255,255,0.85)" darkColor="rgba(255,255,255,0.85)">
+            {"\u2022"}  The steps needed to complete it (if you know!)
+          </ThemedText>
+          <ThemedText style={styles.hintsBullet} lightColor="rgba(255,255,255,0.85)" darkColor="rgba(255,255,255,0.85)">
+            {"\u2022"}  Materials needed to do it (screws, glues etc!)
+          </ThemedText>
+        </Animated.View>
 
         {/* Recording indicator */}
         {isRecording ? (
@@ -435,5 +469,29 @@ const styles = StyleSheet.create({
   },
   permissionButton: {
     minWidth: 200,
+  },
+  hintsContainer: {
+    position: "absolute",
+    left: Spacing.lg,
+    right: Spacing.lg,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  hintsTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: Spacing.sm,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  hintsBullet: {
+    fontSize: 13,
+    lineHeight: 22,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
