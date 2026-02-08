@@ -26,12 +26,16 @@ import Animated, {
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useUserSession } from "@/contexts/UserSessionContext";
 import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
 import { Task, HouseholdMember } from "@shared/schema";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 const RIBBON_HEIGHT = 44;
 const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 0.8 };
@@ -102,12 +106,15 @@ function getPriorityColor(priority: string): string {
   }
 }
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export default function PlanScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const { session } = useUserSession();
   const queryClient = useQueryClient();
+  const navigation = useNavigation<NavigationProp>();
   const chatScrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -343,6 +350,39 @@ export default function PlanScreen() {
     savePlanMutation.mutate(plan);
   }, [plan, isSaved, savePlanMutation]);
 
+  const handleToggleSubtask = useCallback(
+    async (task: Task, subtaskIndex: number) => {
+      const subtasks = ((task as any).subtasks as any[] | null) || [];
+      const updated = subtasks.map((s, i) =>
+        i === subtaskIndex ? { ...s, completed: !s.completed } : s
+      );
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await apiRequest("PATCH", `/api/tasks/${task.id}`, { subtasks: updated });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    },
+    [queryClient]
+  );
+
+  const handleToggleShoppingItem = useCallback(
+    async (task: Task, itemIndex: number) => {
+      const shoppingList = ((task as any).shoppingList as any[] | null) || [];
+      const updated = shoppingList.map((s, i) =>
+        i === itemIndex ? { ...s, checked: !s.checked } : s
+      );
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await apiRequest("PATCH", `/api/tasks/${task.id}`, { shoppingList: updated });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    },
+    [queryClient]
+  );
+
+  const navigateToTask = useCallback(
+    (task: Task) => {
+      navigation.navigate("TaskDetail", { task });
+    },
+    [navigation]
+  );
+
   const renderTaskDetail = (matchedTask: Task) => {
     const subtasks = (matchedTask.subtasks as any[] | null) || [];
     const shoppingList = (matchedTask.shoppingList as any[] | null) || [];
@@ -387,7 +427,13 @@ export default function PlanScreen() {
               </ThemedText>
             </View>
             {subtasks.map((sub: any, idx: number) => (
-              <View key={idx} style={styles.subtaskRow}>
+              <Pressable
+                key={idx}
+                style={styles.subtaskRow}
+                onPress={() => handleToggleSubtask(matchedTask, idx)}
+                hitSlop={6}
+                testID={`plan-subtask-${matchedTask.id}-${idx}`}
+              >
                 <Feather
                   name={sub.completed ? "check-square" : "square"}
                   size={14}
@@ -402,7 +448,7 @@ export default function PlanScreen() {
                 >
                   {sub.title}
                 </ThemedText>
-              </View>
+              </Pressable>
             ))}
           </View>
         ) : null}
@@ -413,15 +459,42 @@ export default function PlanScreen() {
               Materials Needed
             </ThemedText>
             {shoppingList.map((item: any, idx: number) => (
-              <View key={idx} style={styles.subtaskRow}>
-                <Feather name="shopping-bag" size={14} color={theme.textSecondary} />
-                <ThemedText style={[styles.subtaskText, { color: theme.text }]}>
+              <Pressable
+                key={idx}
+                style={styles.subtaskRow}
+                onPress={() => handleToggleShoppingItem(matchedTask, idx)}
+                hitSlop={6}
+                testID={`plan-shopping-${matchedTask.id}-${idx}`}
+              >
+                <Feather
+                  name={item.checked ? "check-square" : "square"}
+                  size={14}
+                  color={item.checked ? AppColors.success : theme.textSecondary}
+                />
+                <ThemedText
+                  style={[
+                    styles.subtaskText,
+                    { color: item.checked ? theme.textSecondary : theme.text },
+                    item.checked ? styles.subtaskCompleted : null,
+                  ]}
+                >
                   {item.item}
                 </ThemedText>
-              </View>
+              </Pressable>
             ))}
           </View>
         ) : null}
+
+        <Pressable
+          style={[styles.viewTaskButton, { backgroundColor: theme.primary + "15", borderColor: theme.primary + "30" }]}
+          onPress={() => navigateToTask(matchedTask)}
+          testID={`button-view-task-${matchedTask.id}`}
+        >
+          <ThemedText style={[styles.viewTaskText, { color: theme.primary }]}>
+            View Full Task
+          </ThemedText>
+          <Feather name="arrow-right" size={14} color={theme.primary} />
+        </Pressable>
       </View>
     );
   };
@@ -522,9 +595,21 @@ export default function PlanScreen() {
                           <View style={styles.taskRowLeft}>
                             <Feather name="check-circle" size={16} color={theme.textSecondary} />
                             <View style={styles.taskInfo}>
-                              <ThemedText style={[styles.taskName, { color: theme.text }]}>
-                                {task.taskTitle}
-                              </ThemedText>
+                              <Pressable
+                                onPress={matchedTask ? () => navigateToTask(matchedTask) : undefined}
+                                disabled={!matchedTask}
+                                hitSlop={4}
+                              >
+                                <ThemedText
+                                  style={[
+                                    styles.taskName,
+                                    { color: matchedTask ? theme.primary : theme.text },
+                                    matchedTask ? styles.taskNameLink : null,
+                                  ]}
+                                >
+                                  {task.taskTitle}
+                                </ThemedText>
+                              </Pressable>
                               <View style={styles.taskMeta}>
                                 {task.day ? (
                                   <View style={[styles.chip, { backgroundColor: theme.backgroundTertiary }]}>
@@ -829,6 +914,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
+  taskNameLink: {
+    textDecorationLine: "underline" as const,
+  },
   taskMeta: {
     flexDirection: "row",
     gap: Spacing.xs,
@@ -922,6 +1010,20 @@ const styles = StyleSheet.create({
   },
   shoppingSection: {
     gap: 4,
+  },
+  viewTaskButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginTop: Spacing.xs,
+  },
+  viewTaskText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   chatPanelAnimated: {
     overflow: "hidden",
