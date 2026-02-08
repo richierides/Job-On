@@ -77,8 +77,10 @@ Preferred communication style: Simple, everyday language.
 ### Fonts
 - Google Fonts: Manrope and Nunito loaded via `@expo-google-fonts`
 
+## Recent Changes
+- Recording overlay: "What to mention" bullet points displayed over camera view, fades out during recording
+- Materials List tab: Dashboard has Tasks/Materials List tabs; Materials List aggregates shopping items across all tasks with task attribution
+
 ## Roadmap (Upcoming Features)
-- Recording overlay with instructions on what to include in descriptions
 - Task dependencies (tag tasks that depend on others)
 - Basic schedule of works view
-- Dedicated shopping list section aggregating all task materials
