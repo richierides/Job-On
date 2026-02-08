@@ -270,7 +270,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fs.unlinkSync(tempVideoPath);
         fs.unlinkSync(tempAudioPath);
 
-        // Use GPT-4o to structure the transcript into a job card
         const structuringPrompt = `You are an AI assistant that analyzes home maintenance task descriptions.
 
 Given this transcript from a homeowner describing a maintenance issue, extract the following information:
@@ -282,6 +281,9 @@ Respond with a JSON object containing:
 2. "effortScore": A number from 1-5 indicating the complexity/effort required (1=trivial, 5=major project)
 3. "location": The room or area mentioned (choose from: General, Kitchen, Bathroom, Master Bedroom, Bedroom, Living Room, Dining Room, Garage, Garden, Basement, Attic, Laundry Room, Hallway, Exterior). Default to "General" if no clear location.
 4. "priority": Either "Low", "Medium", or "High" based on urgency implied in the transcript. Default to "Medium".
+5. "estimatedMinutes": Your best estimate for how long this task will take in minutes (e.g., 15, 30, 60, 120, 240). Consider the complexity and scope described.
+6. "subtasks": An array of step-by-step actions needed to complete the task. Each item is an object with "title" (string) and "completed" (always false). Derive these from the transcript description. Include 2-6 clear, actionable steps.
+7. "shoppingList": An array of materials or supplies the homeowner mentioned needing to buy or that are clearly required for this job. Each item is an object with "item" (string) and "checked" (always false). If no materials are mentioned or implied, use an empty array.
 
 Respond ONLY with valid JSON, no markdown or explanation.`;
 
@@ -292,7 +294,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
             { role: "user", content: structuringPrompt },
           ],
           response_format: { type: "json_object" },
-          max_completion_tokens: 500,
+          max_completion_tokens: 1500,
         });
 
         const aiResponse = completion.choices[0]?.message?.content || "{}";
@@ -307,6 +309,9 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
             effortScore: 3,
             location: "General",
             priority: "Medium",
+            estimatedMinutes: 30,
+            subtasks: [],
+            shoppingList: [],
           };
         }
 
@@ -315,7 +320,13 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           ? `data:image/png;base64,${thumbnail}`
           : null;
 
-        // Create task in database
+        const subtasks = Array.isArray(taskData.subtasks)
+          ? taskData.subtasks.map((s: any) => ({ title: String(s.title || ""), completed: false }))
+          : [];
+        const shoppingList = Array.isArray(taskData.shoppingList)
+          ? taskData.shoppingList.map((s: any) => ({ item: String(s.item || ""), checked: false }))
+          : [];
+
         const [newTask] = await db
           .insert(tasks)
           .values({
@@ -327,6 +338,9 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
             thumbnailUrl,
             transcript,
             householdId: householdId || null,
+            estimatedMinutes: taskData.estimatedMinutes ? Math.max(5, Math.round(taskData.estimatedMinutes)) : null,
+            subtasks,
+            shoppingList,
           })
           .returning();
 
