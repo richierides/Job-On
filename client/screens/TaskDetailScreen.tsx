@@ -58,6 +58,17 @@ export default function TaskDetailScreen() {
     initialTask.completedAt ? new Date(initialTask.completedAt) : null
   );
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number | null>(
+    (initialTask as any).estimatedMinutes ?? null
+  );
+  const [subtasks, setSubtasks] = useState<{ title: string; completed: boolean }[]>(
+    (initialTask as any).subtasks ?? []
+  );
+  const [shoppingList, setShoppingList] = useState<{ item: string; checked: boolean }[]>(
+    (initialTask as any).shoppingList ?? []
+  );
+  const [newSubtask, setNewSubtask] = useState("");
+  const [newShoppingItem, setNewShoppingItem] = useState("");
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<Task>) => {
@@ -128,6 +139,85 @@ export default function TaskDetailScreen() {
     },
     [updateMutation]
   );
+
+  const handleTimeChange = useCallback(
+    (minutes: number | null) => {
+      setEstimatedMinutes(minutes);
+      updateMutation.mutate({ estimatedMinutes: minutes } as any);
+    },
+    [updateMutation]
+  );
+
+  const handleToggleSubtask = useCallback(
+    async (index: number) => {
+      const updated = subtasks.map((s, i) =>
+        i === index ? { ...s, completed: !s.completed } : s
+      );
+      setSubtasks(updated);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      updateMutation.mutate({ subtasks: updated } as any);
+    },
+    [subtasks, updateMutation]
+  );
+
+  const handleAddSubtask = useCallback(() => {
+    if (!newSubtask.trim()) return;
+    const updated = [...subtasks, { title: newSubtask.trim(), completed: false }];
+    setSubtasks(updated);
+    setNewSubtask("");
+    updateMutation.mutate({ subtasks: updated } as any);
+  }, [newSubtask, subtasks, updateMutation]);
+
+  const handleRemoveSubtask = useCallback(
+    (index: number) => {
+      const updated = subtasks.filter((_, i) => i !== index);
+      setSubtasks(updated);
+      updateMutation.mutate({ subtasks: updated } as any);
+    },
+    [subtasks, updateMutation]
+  );
+
+  const handleToggleShoppingItem = useCallback(
+    async (index: number) => {
+      const updated = shoppingList.map((s, i) =>
+        i === index ? { ...s, checked: !s.checked } : s
+      );
+      setShoppingList(updated);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      updateMutation.mutate({ shoppingList: updated } as any);
+    },
+    [shoppingList, updateMutation]
+  );
+
+  const handleAddShoppingItem = useCallback(() => {
+    if (!newShoppingItem.trim()) return;
+    const updated = [...shoppingList, { item: newShoppingItem.trim(), checked: false }];
+    setShoppingList(updated);
+    setNewShoppingItem("");
+    updateMutation.mutate({ shoppingList: updated } as any);
+  }, [newShoppingItem, shoppingList, updateMutation]);
+
+  const handleRemoveShoppingItem = useCallback(
+    (index: number) => {
+      const updated = shoppingList.filter((_, i) => i !== index);
+      setShoppingList(updated);
+      updateMutation.mutate({ shoppingList: updated } as any);
+    },
+    [shoppingList, updateMutation]
+  );
+
+  const formatTime = (minutes: number) => {
+    if (minutes < 60) return `${minutes} min`;
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hrs}h ${mins}m` : `${hrs} hr${hrs > 1 ? "s" : ""}`;
+  };
+
+  const subtaskCompletionPercent = subtasks.length > 0
+    ? Math.round((subtasks.filter((s) => s.completed).length / subtasks.length) * 100)
+    : 0;
+
+  const TIME_PRESETS = [15, 30, 60, 120, 240, 480];
 
   const getEffortDots = (score: number) => {
     const dots = [];
@@ -286,6 +376,166 @@ export default function TaskDetailScreen() {
           <ThemedText style={[styles.effortText, { color: theme.textSecondary }]}>
             {initialTask.effortScore}/5
           </ThemedText>
+        </View>
+      </View>
+
+      {/* Estimated Time */}
+      <View style={styles.section}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          Estimated Time {estimatedMinutes ? `(${formatTime(estimatedMinutes)})` : ""}
+        </ThemedText>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timePresetsScroll}>
+          <View style={styles.timePresetsRow}>
+            {TIME_PRESETS.map((mins) => (
+              <Pressable
+                key={mins}
+                style={[
+                  styles.timePresetButton,
+                  {
+                    backgroundColor: estimatedMinutes === mins ? AppColors.primary : theme.backgroundDefault,
+                    borderColor: estimatedMinutes === mins ? AppColors.primary : theme.border,
+                  },
+                ]}
+                onPress={() => handleTimeChange(estimatedMinutes === mins ? null : mins)}
+                testID={`button-time-${mins}`}
+              >
+                <ThemedText
+                  style={[
+                    styles.timePresetText,
+                    { color: estimatedMinutes === mins ? "#FFFFFF" : theme.text },
+                  ]}
+                >
+                  {formatTime(mins)}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+
+      {/* Subtasks Checklist */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+            Steps
+          </ThemedText>
+          {subtasks.length > 0 ? (
+            <View style={styles.progressBadge}>
+              <View
+                style={[
+                  styles.progressBarTrack,
+                  { backgroundColor: theme.border },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      backgroundColor: subtaskCompletionPercent === 100 ? AppColors.success : AppColors.primary,
+                      width: `${subtaskCompletionPercent}%`,
+                    },
+                  ]}
+                />
+              </View>
+              <ThemedText style={[styles.progressText, { color: theme.textSecondary }]}>
+                {subtaskCompletionPercent}%
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+        {subtasks.map((subtask, index) => (
+          <Pressable
+            key={index}
+            style={[styles.checklistItem, { borderColor: theme.border }]}
+            onPress={() => handleToggleSubtask(index)}
+            testID={`subtask-${index}`}
+          >
+            <Feather
+              name={subtask.completed ? "check-square" : "square"}
+              size={20}
+              color={subtask.completed ? AppColors.success : theme.textSecondary}
+            />
+            <ThemedText
+              style={[
+                styles.checklistText,
+                subtask.completed && styles.checklistTextCompleted,
+              ]}
+            >
+              {subtask.title}
+            </ThemedText>
+            <Pressable onPress={() => handleRemoveSubtask(index)} hitSlop={8}>
+              <Feather name="x" size={16} color={theme.textSecondary} />
+            </Pressable>
+          </Pressable>
+        ))}
+        <View style={[styles.addItemRow, { borderColor: theme.border }]}>
+          <TextInput
+            style={[styles.addItemInput, { color: theme.text }]}
+            value={newSubtask}
+            onChangeText={setNewSubtask}
+            placeholder="Add a step..."
+            placeholderTextColor={theme.textSecondary}
+            onSubmitEditing={handleAddSubtask}
+            returnKeyType="done"
+            testID="input-new-subtask"
+          />
+          <Pressable onPress={handleAddSubtask} testID="button-add-subtask">
+            <Feather name="plus-circle" size={22} color={AppColors.primary} />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Shopping List */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+            Shopping List
+          </ThemedText>
+          {shoppingList.length > 0 ? (
+            <ThemedText style={[styles.progressText, { color: theme.textSecondary }]}>
+              {shoppingList.filter((s) => s.checked).length}/{shoppingList.length}
+            </ThemedText>
+          ) : null}
+        </View>
+        {shoppingList.map((item, index) => (
+          <Pressable
+            key={index}
+            style={[styles.checklistItem, { borderColor: theme.border }]}
+            onPress={() => handleToggleShoppingItem(index)}
+            testID={`shopping-item-${index}`}
+          >
+            <Feather
+              name={item.checked ? "check-square" : "square"}
+              size={20}
+              color={item.checked ? AppColors.success : theme.textSecondary}
+            />
+            <ThemedText
+              style={[
+                styles.checklistText,
+                item.checked && styles.checklistTextCompleted,
+              ]}
+            >
+              {item.item}
+            </ThemedText>
+            <Pressable onPress={() => handleRemoveShoppingItem(index)} hitSlop={8}>
+              <Feather name="x" size={16} color={theme.textSecondary} />
+            </Pressable>
+          </Pressable>
+        ))}
+        <View style={[styles.addItemRow, { borderColor: theme.border }]}>
+          <TextInput
+            style={[styles.addItemInput, { color: theme.text }]}
+            value={newShoppingItem}
+            onChangeText={setNewShoppingItem}
+            placeholder="Add an item..."
+            placeholderTextColor={theme.textSecondary}
+            onSubmitEditing={handleAddShoppingItem}
+            returnKeyType="done"
+            testID="input-new-shopping"
+          />
+          <Pressable onPress={handleAddShoppingItem} testID="button-add-shopping">
+            <Feather name="shopping-cart" size={20} color={AppColors.primary} />
+          </Pressable>
         </View>
       </View>
 
@@ -486,6 +736,78 @@ const styles = StyleSheet.create({
   effortText: {
     fontSize: Typography.body.fontSize,
     fontWeight: "500",
+  },
+  timePresetsScroll: {
+    marginHorizontal: -Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+  },
+  timePresetsRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  timePresetButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.xs,
+    borderWidth: 1,
+  },
+  timePresetText: {
+    fontSize: Typography.small.fontSize,
+    fontWeight: "600",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  progressBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  progressBarTrack: {
+    width: 60,
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  checklistItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    gap: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  checklistText: {
+    flex: 1,
+    fontSize: Typography.body.fontSize,
+  },
+  checklistTextCompleted: {
+    textDecorationLine: "line-through",
+    opacity: 0.5,
+  },
+  addItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  addItemInput: {
+    flex: 1,
+    fontSize: Typography.body.fontSize,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
   },
   statusButton: {
     flexDirection: "row",

@@ -18,6 +18,19 @@ interface TaskCardProps {
 export function TaskCard({ task, assigneeName, onPress, onPropertyPress }: TaskCardProps) {
   const { theme } = useTheme();
 
+  const subtasks = (task as any).subtasks as { title: string; completed: boolean }[] | null;
+  const subtaskCount = subtasks?.length || 0;
+  const subtasksDone = subtasks?.filter((s) => s.completed).length || 0;
+  const shoppingList = (task as any).shoppingList as { item: string; checked: boolean }[] | null;
+  const shoppingCount = shoppingList?.length || 0;
+
+  const formatTime = (minutes: number) => {
+    if (minutes < 60) return `${minutes}m`;
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+  };
+
   const formatDate = (date: Date | string | null) => {
     if (!date) return null;
     const d = new Date(date);
@@ -86,6 +99,35 @@ export function TaskCard({ task, assigneeName, onPress, onPropertyPress }: TaskC
           onPress={() => onPropertyPress("effort")}
         />
       </View>
+
+      {((task as any).estimatedMinutes || subtaskCount > 0 || shoppingCount > 0) ? (
+        <View style={[styles.metaRow, { borderTopColor: theme.border }]}>
+          {(task as any).estimatedMinutes ? (
+            <View style={styles.metaItem}>
+              <Feather name="clock" size={13} color={theme.textSecondary} />
+              <ThemedText style={[styles.metaText, { color: theme.textSecondary }]}>
+                {formatTime((task as any).estimatedMinutes)}
+              </ThemedText>
+            </View>
+          ) : null}
+          {subtaskCount > 0 ? (
+            <View style={styles.metaItem}>
+              <Feather name="check-square" size={13} color={subtasksDone === subtaskCount ? theme.success : theme.textSecondary} />
+              <ThemedText style={[styles.metaText, { color: subtasksDone === subtaskCount ? theme.success : theme.textSecondary }]}>
+                {subtasksDone}/{subtaskCount} steps
+              </ThemedText>
+            </View>
+          ) : null}
+          {shoppingCount > 0 ? (
+            <View style={styles.metaItem}>
+              <Feather name="shopping-cart" size={13} color={theme.textSecondary} />
+              <ThemedText style={[styles.metaText, { color: theme.textSecondary }]}>
+                {shoppingCount} {shoppingCount === 1 ? "item" : "items"}
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
         <Pressable style={styles.footerItem} onPress={() => onPropertyPress("assignee")}>
@@ -172,6 +214,23 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.md,
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: "500",
   },
   cardFooter: {
     flexDirection: "row",
