@@ -352,6 +352,86 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
     }
   );
 
+  // ============ Plan Chat Endpoint ============
+
+  app.post("/api/plan/chat", async (req: Request, res: Response) => {
+    try {
+      const { messages, tasks: pendingTasks, members: availableMembers } = req.body;
+
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: "Messages array is required" });
+      }
+
+      const taskSummary = (pendingTasks || [])
+        .map((t: any) => `- "${t.title}" (${t.location}, ${t.priority} priority, effort ${t.effortScore}/5, ~${t.estimatedMinutes || '?'}min)`)
+        .join("\n");
+
+      const memberList = (availableMembers || [])
+        .map((m: any) => m.name)
+        .join(", ");
+
+      const systemPrompt = `You are a friendly home maintenance planning assistant for the HomeFix app. You help homeowners create a sensible weekly plan for their pending tasks.
+
+You have access to these pending tasks:
+${taskSummary || "No tasks yet."}
+
+Household members: ${memberList || "Just the homeowner."}
+
+Your job is to have a SHORT conversation (2-3 questions max) to understand:
+1. When they want to start (e.g. "this weekend", "next Monday")
+2. How much time each person has available per week (e.g. "weekends only, about 4 hours", "a couple of evenings, 2 hours each")
+
+Then generate a structured weekly plan. When generating the plan, respond with a JSON block wrapped in \`\`\`json ... \`\`\` containing:
+{
+  "plan": {
+    "startDate": "YYYY-MM-DD",
+    "weeks": [
+      {
+        "weekNumber": 1,
+        "label": "Week 1 - Feb 10-16",
+        "tasks": [
+          {
+            "taskTitle": "Fix bathroom tap",
+            "assignee": "Person name or null",
+            "estimatedMinutes": 60,
+            "day": "Saturday"
+          }
+        ],
+        "totalMinutes": 120
+      }
+    ]
+  }
+}
+
+Guidelines for planning:
+- Group tasks by location when possible (do all kitchen jobs together)
+- Put high priority tasks first
+- Respect the time budget each person has
+- Keep each week's total within available hours
+- Add a brief friendly message before the JSON explaining the plan
+- If the user asks to adjust the plan, regenerate the full JSON with changes
+- Keep responses concise and conversational`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages.map((m: any) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })),
+        ],
+        max_completion_tokens: 2000,
+      });
+
+      const reply = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response.";
+      res.json({ reply });
+    } catch (error) {
+      console.error("Error in plan chat:", error);
+      res.status(500).json({ error: "Failed to generate plan response" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
