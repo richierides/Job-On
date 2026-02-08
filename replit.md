@@ -34,16 +34,17 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: `shared/schema.ts`
 - **Main Tables**:
   - `households` - Household groups with 6-character invite codes for sharing
-  - `householdMembers` - Members of households (name only, no authentication required)
+  - `householdMembers` - Members of households (name, optional email/passwordHash for account claiming)
   - `tasks` - Job cards with title, location, priority, effort score, status, householdId, assignedToId, estimatedMinutes, subtasks (JSONB), shoppingList (JSONB), completedAt
 - **Migrations**: Managed via `drizzle-kit push`
 
-### Household System (No Auth)
+### Household System (Optional Email Auth)
 - Users create or join households using 6-character invite codes
-- Members are identified by name only, stored locally via AsyncStorage
-- Tasks belong to households and can be assigned to any household member
+- Members can optionally attach an email and password to their profile via Settings > "Save My Account"
+- Returning users can sign in with email/password from the onboarding screen to restore their session on any device
 - Session data: `client/contexts/UserSessionContext.tsx` stores memberId, memberName, householdId, householdName, inviteCode
-- Onboarding flow: `OnboardingScreen` handles household creation/joining and member setup
+- Onboarding flow: `OnboardingScreen` handles household creation/joining, member setup, and email sign-in
+- Auth endpoints: POST /api/auth/register (attach email to existing member), POST /api/auth/login (sign in, returns member + household)
 
 ### Project Structure
 - `client/` - React Native frontend code (components, screens, hooks, navigation)
