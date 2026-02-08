@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -64,6 +64,9 @@ export const tasks = pgTable("tasks", {
   transcript: text("transcript"),
   householdId: integer("household_id"),
   assignedToId: integer("assigned_to_id"),
+  estimatedMinutes: integer("estimated_minutes"),
+  subtasks: jsonb("subtasks").$type<{ title: string; completed: boolean }[]>(),
+  shoppingList: jsonb("shopping_list").$type<{ item: string; checked: boolean }[]>(),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
