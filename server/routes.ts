@@ -4,6 +4,7 @@ import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import * as fs from "fs";
 import * as path from "path";
+import bcrypt from "bcryptjs";
 import OpenAI, { toFile } from "openai";
 import { tasks, insertTaskSchema, updateTaskSchema, households, householdMembers, insertHouseholdSchema, insertHouseholdMemberSchema } from "@shared/schema";
 import { db } from "./db";
@@ -429,6 +430,71 @@ Guidelines for planning:
     } catch (error) {
       console.error("Error in plan chat:", error);
       res.status(500).json({ error: "Failed to generate plan response" });
+    }
+  });
+
+  // ============ Auth Endpoints ============
+
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
+    try {
+      const { memberId, email, password } = req.body;
+      if (!memberId || !email || !password) {
+        return res.status(400).json({ error: "Member ID, email, and password are required" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const [existingMember] = await db.select().from(householdMembers).where(eq(householdMembers.id, memberId));
+      if (!existingMember) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+
+      const [emailTaken] = await db.select().from(householdMembers).where(eq(householdMembers.email, email.toLowerCase().trim()));
+      if (emailTaken) {
+        return res.status(409).json({ error: "This email is already registered" });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const [updated] = await db
+        .update(householdMembers)
+        .set({ email: email.toLowerCase().trim(), passwordHash })
+        .where(eq(householdMembers.id, memberId))
+        .returning();
+
+      res.json({ success: true, member: { id: updated.id, name: updated.name, email: updated.email, householdId: updated.householdId } });
+    } catch (error) {
+      console.error("Error registering:", error);
+      res.status(500).json({ error: "Failed to register account" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const [member] = await db.select().from(householdMembers).where(eq(householdMembers.email, email.toLowerCase().trim()));
+      if (!member || !member.passwordHash) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const valid = await bcrypt.compare(password, member.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const [household] = await db.select().from(households).where(eq(households.id, member.householdId));
+
+      res.json({
+        member: { id: member.id, name: member.name, email: member.email, householdId: member.householdId },
+        household: household || null,
+      });
+    } catch (error) {
+      console.error("Error logging in:", error);
+      res.status(500).json({ error: "Failed to log in" });
     }
   });
 
