@@ -74,7 +74,7 @@ export default function PlanScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const { session } = useUserSession();
-  const scrollRef = useRef<ScrollView>(null);
+  const chatScrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -138,7 +138,7 @@ export default function PlanScreen() {
     setIsLoading(true);
 
     setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: true });
+      chatScrollRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
     try {
@@ -181,7 +181,7 @@ export default function PlanScreen() {
     } finally {
       setIsLoading(false);
       setTimeout(() => {
-        scrollRef.current?.scrollToEnd({ animated: true });
+        chatScrollRef.current?.scrollToEnd({ animated: true });
       }, 200);
     }
   }, [inputText, isLoading, messages, pendingTasks, members]);
@@ -194,12 +194,30 @@ export default function PlanScreen() {
     }));
   }, []);
 
-  const renderPlanCard = () => {
-    if (!plan) return null;
+  const renderPlanPanel = () => {
+    if (!plan) {
+      return (
+        <View style={styles.planEmptyState}>
+          <Feather name="calendar" size={28} color={theme.textSecondary} />
+          <ThemedText style={[styles.planEmptyTitle, { color: theme.textSecondary }]}>
+            No plan yet
+          </ThemedText>
+          <ThemedText style={[styles.planEmptyHint, { color: theme.textSecondary }]}>
+            Chat below to generate your work schedule
+          </ThemedText>
+        </View>
+      );
+    }
 
     return (
-      <View style={[styles.planContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-        <View style={styles.planHeader}>
+      <ScrollView
+        style={styles.planScroll}
+        contentContainerStyle={styles.planScrollContent}
+        showsVerticalScrollIndicator={true}
+        nestedScrollEnabled={true}
+        testID="plan-scroll-area"
+      >
+        <View style={styles.planHeaderRow}>
           <Feather name="calendar" size={18} color={theme.primary} />
           <ThemedText style={[styles.planTitle, { color: theme.text }]}>
             Your Plan
@@ -272,7 +290,7 @@ export default function PlanScreen() {
             </View>
           );
         })}
-      </View>
+      </ScrollView>
     );
   };
 
@@ -312,31 +330,39 @@ export default function PlanScreen() {
       behavior="padding"
       keyboardVerticalOffset={0}
     >
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scrollArea}
-        contentContainerStyle={[
-          styles.scrollContent,
-          {
-            paddingTop: headerHeight + Spacing.md,
-            paddingBottom: Spacing.md,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {renderPlanCard()}
-        {renderChatMessages()}
+      <View style={[styles.planPanel, { paddingTop: headerHeight + Spacing.sm, backgroundColor: theme.backgroundDefault, borderBottomColor: theme.border }]}>
+        {renderPlanPanel()}
+      </View>
 
-        {isLoading ? (
-          <View style={[styles.loadingBubble, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-            <ActivityIndicator size="small" color={theme.primary} />
-            <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
-              Thinking...
-            </ThemedText>
-          </View>
-        ) : null}
-      </ScrollView>
+      <View style={[styles.chatPanel, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={styles.chatHeaderRow}>
+          <Feather name="message-circle" size={16} color={theme.textSecondary} />
+          <ThemedText style={[styles.chatHeaderText, { color: theme.textSecondary }]}>
+            Chat
+          </ThemedText>
+        </View>
+
+        <ScrollView
+          ref={chatScrollRef}
+          style={styles.chatScroll}
+          contentContainerStyle={styles.chatScrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={true}
+          nestedScrollEnabled={true}
+          testID="chat-scroll-area"
+        >
+          {renderChatMessages()}
+
+          {isLoading ? (
+            <View style={[styles.loadingBubble, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+              <ActivityIndicator size="small" color={theme.primary} />
+              <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
+                Thinking...
+              </ThemedText>
+            </View>
+          ) : null}
+        </ScrollView>
+      </View>
 
       <View
         style={[
@@ -405,26 +431,40 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollArea: {
+  planPanel: {
+    flex: 1,
+    minHeight: 140,
+    borderBottomWidth: 1,
+  },
+  planEmptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.xs,
+  },
+  planEmptyTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginTop: Spacing.xs,
+  },
+  planEmptyHint: {
+    fontSize: 13,
+    textAlign: "center",
+  },
+  planScroll: {
     flex: 1,
   },
-  scrollContent: {
+  planScrollContent: {
     paddingHorizontal: Spacing.lg,
-    flexGrow: 1,
+    paddingVertical: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
-  planContainer: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-    overflow: "hidden",
-  },
-  planHeader: {
+  planHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 0,
+    marginBottom: Spacing.sm,
   },
   planTitle: {
     fontSize: 16,
@@ -437,8 +477,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xs,
   },
   weekHeaderLeft: {
     flexDirection: "row",
@@ -455,7 +495,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   weekTasks: {
-    paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.md,
     gap: Spacing.xs,
   },
@@ -502,6 +541,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     marginLeft: Spacing.sm,
+  },
+  chatPanel: {
+    flex: 1,
+    minHeight: 160,
+  },
+  chatHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+  },
+  chatHeaderText: {
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  chatScroll: {
+    flex: 1,
+  },
+  chatScrollContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
   },
   messageBubble: {
     marginBottom: Spacing.sm,
