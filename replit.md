@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
 - **Main Tables**:
   - `households` - Household groups with 6-character invite codes for sharing
   - `householdMembers` - Members of households (name only, no authentication required)
-  - `tasks` - Job cards with title, location, priority, effort score, status, householdId, assignedToId, completedAt
+  - `tasks` - Job cards with title, location, priority, effort score, status, householdId, assignedToId, estimatedMinutes, subtasks (JSONB), shoppingList (JSONB), completedAt
 - **Migrations**: Managed via `drizzle-kit push`
 
 ### Household System (No Auth)
@@ -76,3 +76,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Fonts
 - Google Fonts: Manrope and Nunito loaded via `@expo-google-fonts`
+
+## Roadmap (Upcoming Features)
+- Recording overlay with instructions on what to include in descriptions
+- Task dependencies (tag tasks that depend on others)
+- Basic schedule of works view
+- Dedicated shopping list section aggregating all task materials
