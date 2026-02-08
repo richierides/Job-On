@@ -1,5 +1,5 @@
-import React from "react";
-import { View, StyleSheet, Pressable, Linking, useColorScheme } from "react-native";
+import React, { useState } from "react";
+import { View, StyleSheet, Pressable, Linking, useColorScheme, TextInput, ActivityIndicator, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -7,6 +7,8 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useUserSession } from "@/contexts/UserSessionContext";
+import { apiRequest } from "@/lib/query-client";
 import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
@@ -59,10 +61,60 @@ export default function SettingsScreen() {
   const headerHeight = useHeaderHeight();
   const { theme, isDark } = useTheme();
   const systemColorScheme = useColorScheme();
+  const { session } = useUserSession();
+
+  const [showRegister, setShowRegister] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [registered, setRegistered] = useState(false);
 
   const handleOpenWebsite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Linking.openURL("https://replit.com");
+  };
+
+  const handleRegister = async () => {
+    setRegisterError(null);
+
+    if (!email.trim()) {
+      setRegisterError("Please enter your email");
+      return;
+    }
+    if (!email.includes("@")) {
+      setRegisterError("Please enter a valid email");
+      return;
+    }
+    if (password.length < 6) {
+      setRegisterError("Password must be at least 6 characters");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setRegisterError("Passwords don't match");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await apiRequest("POST", "/api/auth/register", {
+        memberId: session.memberId,
+        email: email.trim(),
+        password,
+      });
+      const data = await response.json();
+      if (data.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setRegistered(true);
+        setShowRegister(false);
+      }
+    } catch (err: any) {
+      const message = err?.message || "Something went wrong. Please try again.";
+      setRegisterError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -74,7 +126,107 @@ export default function SettingsScreen() {
         paddingHorizontal: Spacing.lg,
       }}
     >
-      {/* App Info Section */}
+      <View style={styles.section}>
+        <ThemedText style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+          Account
+        </ThemedText>
+        <View style={[styles.sectionContent, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <SettingsRow
+            icon="user"
+            title={session.memberName || "Guest"}
+            subtitle={session.householdName || "No household"}
+            showChevron={false}
+          />
+          <SettingsRow
+            icon="copy"
+            title="Invite Code"
+            subtitle={session.inviteCode || "---"}
+            showChevron={false}
+          />
+          {registered ? (
+            <SettingsRow
+              icon="check-circle"
+              title="Account Saved"
+              subtitle={email}
+              showChevron={false}
+              rightElement={
+                <Feather name="check" size={18} color={AppColors.success} />
+              }
+            />
+          ) : (
+            <SettingsRow
+              icon="shield"
+              title="Save My Account"
+              subtitle="Add email and password to sign in later"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowRegister(!showRegister);
+              }}
+              rightElement={
+                showRegister ? (
+                  <Feather name="chevron-up" size={18} color={theme.textSecondary} />
+                ) : undefined
+              }
+              showChevron={!showRegister}
+            />
+          )}
+        </View>
+
+        {showRegister ? (
+          <View style={[styles.registerForm, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+            <TextInput
+              testID="input-register-email"
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="Email address"
+              placeholderTextColor={theme.textSecondary}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              editable={!isSubmitting}
+            />
+            <TextInput
+              testID="input-register-password"
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="Password (min 6 characters)"
+              placeholderTextColor={theme.textSecondary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="new-password"
+              editable={!isSubmitting}
+            />
+            <TextInput
+              testID="input-register-confirm"
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="Confirm password"
+              placeholderTextColor={theme.textSecondary}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              autoComplete="new-password"
+              editable={!isSubmitting}
+            />
+            {registerError ? (
+              <ThemedText style={styles.errorText}>{registerError}</ThemedText>
+            ) : null}
+            <Pressable
+              testID="button-save-account"
+              style={[styles.saveButton, { backgroundColor: AppColors.primary, opacity: isSubmitting ? 0.7 : 1 }]}
+              onPress={handleRegister}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <ThemedText style={styles.saveButtonText}>Save Account</ThemedText>
+              )}
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+
       <View style={styles.section}>
         <ThemedText style={[styles.sectionTitle, { color: theme.textSecondary }]}>
           About
@@ -102,7 +254,6 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Features Section */}
       <View style={styles.section}>
         <ThemedText style={[styles.sectionTitle, { color: theme.textSecondary }]}>
           Features
@@ -129,7 +280,6 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Links Section */}
       <View style={styles.section}>
         <ThemedText style={[styles.sectionTitle, { color: theme.textSecondary }]}>
           Links
@@ -143,7 +293,6 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Credits */}
       <View style={styles.creditsContainer}>
         <ThemedText style={[styles.creditsText, { color: theme.textSecondary }]}>
           Made with Replit
@@ -197,6 +346,37 @@ const styles = StyleSheet.create({
   rowSubtitle: {
     fontSize: Typography.small.fontSize,
     marginTop: 2,
+  },
+  registerForm: {
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    fontSize: Typography.body.fontSize,
+    marginBottom: Spacing.sm,
+  },
+  errorText: {
+    color: AppColors.error,
+    fontSize: Typography.small.fontSize,
+    marginBottom: Spacing.sm,
+  },
+  saveButton: {
+    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: Spacing.xs,
+  },
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: Typography.body.fontSize,
   },
   creditsContainer: {
     alignItems: "center",
