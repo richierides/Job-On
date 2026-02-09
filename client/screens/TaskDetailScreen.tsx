@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
 
@@ -20,8 +20,9 @@ import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
-import { Task, PRIORITIES, LOCATIONS, Priority, Location } from "@shared/schema";
-import { apiRequest } from "@/lib/query-client";
+import { Task, HouseholdMember, PRIORITIES, LOCATIONS, Priority, Location } from "@shared/schema";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { useUserSession } from "@/contexts/UserSessionContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "TaskDetail">;
@@ -47,6 +48,7 @@ export default function TaskDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<DetailRouteProp>();
   const queryClient = useQueryClient();
+  const { session } = useUserSession();
 
   const { task: initialTask } = route.params;
 
@@ -58,6 +60,10 @@ export default function TaskDetailScreen() {
     initialTask.completedAt ? new Date(initialTask.completedAt) : null
   );
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
+  const [assignedToId, setAssignedToId] = useState<number | null>(
+    (initialTask as any).assignedToId ?? null
+  );
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | null>(
     (initialTask as any).estimatedMinutes ?? null
   );
@@ -69,6 +75,19 @@ export default function TaskDetailScreen() {
   );
   const [newSubtask, setNewSubtask] = useState("");
   const [newShoppingItem, setNewShoppingItem] = useState("");
+
+  const { data: members = [] } = useQuery<HouseholdMember[]>({
+    queryKey: ["/api/households", session.householdId, "members"],
+    queryFn: async () => {
+      if (!session.householdId) return [];
+      const response = await fetch(
+        `${getApiUrl()}/api/households/${session.householdId}/members`
+      );
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!session.householdId,
+  });
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<Task>) => {
@@ -139,6 +158,18 @@ export default function TaskDetailScreen() {
     },
     [updateMutation]
   );
+
+  const handleAssigneeSelect = useCallback(
+    async (memberId: number | null) => {
+      setAssignedToId(memberId);
+      setShowAssigneePicker(false);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      updateMutation.mutate({ assignedToId: memberId } as any);
+    },
+    [updateMutation]
+  );
+
+  const assigneeName = members.find((m) => m.id === assignedToId)?.name || "Unassigned";
 
   const handleTimeChange = useCallback(
     (minutes: number | null) => {
@@ -328,6 +359,70 @@ export default function TaskDetailScreen() {
                   ]}
                 >
                   {loc}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </View>
+
+      {/* Assignee */}
+      <View style={styles.section}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>Assigned To</ThemedText>
+        <Pressable
+          style={[
+            styles.pickerButton,
+            {
+              backgroundColor: theme.backgroundDefault,
+              borderColor: theme.border,
+            },
+          ]}
+          onPress={() => setShowAssigneePicker(!showAssigneePicker)}
+          testID="button-assignee"
+        >
+          <Feather name="user" size={18} color={theme.textSecondary} />
+          <ThemedText style={styles.pickerText}>{assigneeName}</ThemedText>
+          <Feather
+            name={showAssigneePicker ? "chevron-up" : "chevron-down"}
+            size={18}
+            color={theme.textSecondary}
+          />
+        </Pressable>
+
+        {showAssigneePicker ? (
+          <View style={[styles.optionsContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+            <Pressable
+              style={[
+                styles.optionItem,
+                assignedToId === null && { backgroundColor: AppColors.primary + "20" },
+              ]}
+              onPress={() => handleAssigneeSelect(null)}
+            >
+              <ThemedText
+                style={[
+                  styles.optionText,
+                  assignedToId === null && { color: AppColors.primary, fontWeight: "600" },
+                ]}
+              >
+                Unassigned
+              </ThemedText>
+            </Pressable>
+            {members.map((member) => (
+              <Pressable
+                key={member.id}
+                style={[
+                  styles.optionItem,
+                  assignedToId === member.id && { backgroundColor: AppColors.primary + "20" },
+                ]}
+                onPress={() => handleAssigneeSelect(member.id)}
+              >
+                <ThemedText
+                  style={[
+                    styles.optionText,
+                    assignedToId === member.id && { color: AppColors.primary, fontWeight: "600" },
+                  ]}
+                >
+                  {member.name}
                 </ThemedText>
               </Pressable>
             ))}
