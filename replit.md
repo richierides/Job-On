@@ -80,7 +80,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 - Design refresh: Updated color palette from orange primary to blueprint blue (#2D8CFF) with amber/orange accent (#FF8C2E) to match new app icon. Updated all theme colors, Chip variants, backgrounds, borders. Record button uses accent orange. App icon, splash, favicon all updated.
-- Recording overlay: "What to mention" bullet points displayed over camera view, fades out during recording
+- Recording overlay: "What to mention" bullet points displayed over camera view, stays visible (dimmed to 60% opacity) during recording
 - Materials List tab: Dashboard has Tasks/Materials List tabs; Materials List aggregates shopping items across all tasks with task attribution
 - Plan My Work: Chat-based AI planning assistant (PlanScreen) with split layout - scrollable plan area above, chat input anchored at bottom. Backend POST /api/plan/chat endpoint uses GPT-4o to generate structured weekly plans. AI asks 2-3 setup questions (start date, availability per person) then generates collapsible week-by-week plan cards with task assignments, time estimates, and day scheduling. Users can refine plans through follow-up chat messages.
 - Plan screen split-panel: Plan and chat are now in separate independently-scrollable panels. Top panel shows the generated plan (or empty state), bottom panel shows chat conversation. Both visible simultaneously so the plan stays in view while chatting.
@@ -88,6 +88,8 @@ Preferred communication style: Simple, everyday language.
 - Save Plan: "Save Plan" button appears in plan panel header when a plan is generated. Saves to `saved_plans` table via POST /api/plans. Button changes to "Saved" with checkmark after saving.
 - Saved Plans screen: Accessible from dashboard via archive icon button next to "Plan My Work". Shows saved plans with week/task breakdowns, stats (weeks, tasks, total time), and delete functionality (DELETE /api/plans/:id).
 - Keyboard dismiss: Swiping down the chat panel in Plan screen dismisses the keyboard; tapping the chat ribbon reopens the panel.
+- Video playback: Recorded videos are saved to disk (uploads/videos/) and served via /uploads static route. Task detail screen shows play button overlay on thumbnail; tapping opens inline video player using expo-video with native controls, fullscreen, and PiP support.
+- Auth system: Apple Sign-In (iOS), Google Sign-In (OAuth), and email signup/login. Auth-first onboarding flow. Database tracks authProvider and authProviderId on householdMembers.
 
 ## Roadmap (Upcoming Features)
 - Task dependencies (tag tasks that depend on others)
