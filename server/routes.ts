@@ -357,7 +357,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
 
   app.post("/api/plan/chat", async (req: Request, res: Response) => {
     try {
-      const { messages, tasks: pendingTasks, members: availableMembers } = req.body;
+      const { messages, tasks: pendingTasks, members: availableMembers, householdName } = req.body;
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: "Messages array is required" });
@@ -376,7 +376,8 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
 You have access to these pending tasks:
 ${taskSummary || "No tasks yet."}
 
-Household members: ${memberList || "Just the homeowner."}
+${householdName ? `Household name: "${householdName}" — this is the NAME OF THE HOUSE/HOUSEHOLD, NOT a person. Do not assign tasks to the household name.\n\n` : ""}People in the household who can be assigned tasks: ${memberList || "Just the homeowner."}
+IMPORTANT: Only assign tasks to people listed above. Never assign tasks to the household name itself.
 
 Your job is to have a SHORT conversation (2-3 questions max) to understand:
 1. When they want to start (e.g. "this weekend", "next Monday")

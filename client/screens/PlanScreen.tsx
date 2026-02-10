@@ -285,6 +285,7 @@ export default function PlanScreen() {
     try {
       const res = await apiRequest("POST", "/api/plan/chat", {
         messages: newMessages,
+        householdName: session.householdName,
         tasks: pendingTasks.map((t) => ({
           title: t.title,
           location: t.location,
