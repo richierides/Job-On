@@ -110,7 +110,7 @@ export default function RecordingModal() {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsRecording(true);
       startPulse();
-      hintsOpacity.value = withTiming(0, { duration: 300 });
+      hintsOpacity.value = withTiming(0.6, { duration: 300 });
 
       setRecordingDuration(0);
       timerRef.current = setInterval(() => {

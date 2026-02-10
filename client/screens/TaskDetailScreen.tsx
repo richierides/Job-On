@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   ScrollView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -15,6 +16,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
+import { useVideoPlayer, VideoView } from "expo-video";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
@@ -24,6 +26,7 @@ import { Task, HouseholdMember, PRIORITIES, LOCATIONS, Priority, Location } from
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useUserSession } from "@/contexts/UserSessionContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import type { VideoPlayer } from "expo-video";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "TaskDetail">;
 type DetailRouteProp = RouteProp<RootStackParamList, "TaskDetail">;
@@ -75,6 +78,15 @@ export default function TaskDetailScreen() {
   );
   const [newSubtask, setNewSubtask] = useState("");
   const [newShoppingItem, setNewShoppingItem] = useState("");
+  const [showVideo, setShowVideo] = useState(false);
+
+  const videoSource = initialTask.videoUrl
+    ? `${getApiUrl()}${initialTask.videoUrl}`
+    : null;
+
+  const player = useVideoPlayer(videoSource, (p: VideoPlayer) => {
+    p.loop = false;
+  });
 
   const { data: members = [] } = useQuery<HouseholdMember[]>({
     queryKey: ["/api/households", session.householdId, "members"],
@@ -277,14 +289,51 @@ export default function TaskDetailScreen() {
         },
       ]}
     >
-      {/* Thumbnail */}
+      {/* Video / Thumbnail */}
       <View style={styles.thumbnailContainer}>
-        {initialTask.thumbnailUrl ? (
-          <Image
-            source={{ uri: initialTask.thumbnailUrl }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
+        {showVideo && videoSource ? (
+          <View style={styles.videoContainer}>
+            <VideoView
+              style={styles.thumbnail}
+              player={player}
+              allowsFullscreen
+              allowsPictureInPicture={Platform.OS !== "web"}
+              contentFit="cover"
+              nativeControls
+            />
+            <Pressable
+              style={styles.videoCloseButton}
+              onPress={() => {
+                player.pause();
+                setShowVideo(false);
+              }}
+              hitSlop={8}
+            >
+              <Feather name="x" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        ) : initialTask.thumbnailUrl ? (
+          <Pressable
+            onPress={() => {
+              if (videoSource) {
+                setShowVideo(true);
+                player.play();
+              }
+            }}
+          >
+            <Image
+              source={{ uri: initialTask.thumbnailUrl }}
+              style={styles.thumbnail}
+              resizeMode="cover"
+            />
+            {videoSource ? (
+              <View style={styles.playButtonOverlay}>
+                <View style={styles.playButton}>
+                  <Feather name="play" size={28} color="#FFFFFF" />
+                </View>
+              </View>
+            ) : null}
+          </Pressable>
         ) : (
           <View style={[styles.thumbnailPlaceholder, { backgroundColor: theme.backgroundSecondary }]}>
             <Feather name="home" size={48} color={theme.textSecondary} />
@@ -753,6 +802,37 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     alignItems: "center",
     justifyContent: "center",
+  },
+  videoContainer: {
+    position: "relative",
+  },
+  videoCloseButton: {
+    position: "absolute",
+    top: Spacing.sm,
+    right: Spacing.sm,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  playButtonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: BorderRadius.sm,
+  },
+  playButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 4,
   },
   section: {
     marginBottom: Spacing.xl,

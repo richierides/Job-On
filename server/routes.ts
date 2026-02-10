@@ -22,7 +22,14 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const UPLOADS_DIR = path.join(process.cwd(), "uploads", "videos");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.use("/uploads", require("express").static(path.join(process.cwd(), "uploads")));
+
   // Increase JSON body limit for base64 videos
   app.use((req, res, next) => {
     if (req.path === "/api/tasks/process-video") {
@@ -279,9 +286,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const transcript = transcription.text;
 
-        // Clean up temp files
-        fs.unlinkSync(tempVideoPath);
+        // Clean up temp audio file
         fs.unlinkSync(tempAudioPath);
+
+        // Save video permanently
+        const videoFilename = `${uuidv4()}.mp4`;
+        const permanentVideoPath = path.join(UPLOADS_DIR, videoFilename);
+        fs.renameSync(tempVideoPath, permanentVideoPath);
+        const videoUrl = `/uploads/videos/${videoFilename}`;
 
         const structuringPrompt = `You are an AI assistant that analyzes home maintenance task descriptions.
 
@@ -349,6 +361,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
             priority: taskData.priority || "Medium",
             status: "Pending",
             thumbnailUrl,
+            videoUrl,
             transcript,
             householdId: householdId || null,
             estimatedMinutes: taskData.estimatedMinutes ? Math.max(5, Math.round(taskData.estimatedMinutes)) : null,
