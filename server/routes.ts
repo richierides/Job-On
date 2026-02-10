@@ -243,6 +243,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update member (auth info linkage)
+  app.patch("/api/members/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const { email, authProvider, authProviderId } = req.body;
+      const updates: any = {};
+      if (email) updates.email = email;
+      if (authProvider) updates.authProvider = authProvider;
+      if (authProviderId) updates.authProviderId = authProviderId;
+
+      const [updated] = await db.update(householdMembers)
+        .set(updates)
+        .where(eq(householdMembers.id, id))
+        .returning();
+      if (!updated) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating member:", error);
+      res.status(500).json({ error: "Failed to update member" });
+    }
+  });
+
   // Get all households a member belongs to (by shared auth identity)
   app.get("/api/members/:id/households", async (req: Request, res: Response) => {
     try {
