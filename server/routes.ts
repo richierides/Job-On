@@ -255,9 +255,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "Video file is required" });
         }
 
+        console.log("Video upload received:", {
+          originalname: videoFile.originalname,
+          mimetype: videoFile.mimetype,
+          size: videoFile.size,
+        });
+
         const videoBuffer = videoFile.buffer;
 
-        const tempVideoPath = path.join("/tmp", `video_${uuidv4()}.mp4`);
+        const videoExt = videoFile.originalname?.endsWith(".mov") ? ".mov" : ".mp4";
+        const tempVideoPath = path.join("/tmp", `video_${uuidv4()}${videoExt}`);
         const tempAudioPath = path.join("/tmp", `audio_${uuidv4()}.wav`);
 
         fs.writeFileSync(tempVideoPath, videoBuffer);
@@ -266,6 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { spawn } = require("child_process");
         await new Promise<void>((resolve, reject) => {
           const ffmpeg = spawn("ffmpeg", [
+            "-y",
             "-i", tempVideoPath,
             "-vn",
             "-acodec", "pcm_s16le",
@@ -274,9 +282,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tempAudioPath,
           ]);
 
+          let stderrData = "";
+          ffmpeg.stderr.on("data", (data: Buffer) => {
+            stderrData += data.toString();
+          });
+
           ffmpeg.on("close", (code: number) => {
             if (code === 0) resolve();
-            else reject(new Error(`ffmpeg exited with code ${code}`));
+            else {
+              console.error("ffmpeg stderr:", stderrData);
+              reject(new Error(`ffmpeg exited with code ${code}`));
+            }
           });
           ffmpeg.on("error", reject);
         });
