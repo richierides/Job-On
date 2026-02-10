@@ -1,5 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { HeaderButton } from "@react-navigation/elements";
 import { Pressable, ActivityIndicator, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
@@ -57,12 +58,11 @@ export default function RootStackNavigator() {
             options={({ navigation }) => ({
               headerTitle: () => <HeaderTitle title="HomeFix" />,
               headerRight: () => (
-                <Pressable
+                <HeaderButton
                   onPress={() => navigation.navigate("Settings")}
-                  hitSlop={8}
                 >
                   <Feather name="settings" size={22} color={theme.text} />
-                </Pressable>
+                </HeaderButton>
               ),
             })}
           />
