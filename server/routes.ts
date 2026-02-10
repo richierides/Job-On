@@ -10,9 +10,19 @@ import { tasks, insertTaskSchema, updateTaskSchema, households, householdMembers
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
 
-// Configure multer for file uploads
+// Configure multer for file uploads (disk storage for large video files)
+const uploadTmpDir = path.join("/tmp", "uploads");
+if (!fs.existsSync(uploadTmpDir)) {
+  fs.mkdirSync(uploadTmpDir, { recursive: true });
+}
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: uploadTmpDir,
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".mov";
+      cb(null, `${uuidv4()}${ext}`);
+    },
+  }),
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
 });
 
@@ -259,15 +269,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           originalname: videoFile.originalname,
           mimetype: videoFile.mimetype,
           size: videoFile.size,
+          path: videoFile.path,
         });
 
-        const videoBuffer = videoFile.buffer;
-
-        const videoExt = videoFile.originalname?.endsWith(".mov") ? ".mov" : ".mp4";
-        const tempVideoPath = path.join("/tmp", `video_${uuidv4()}${videoExt}`);
+        const tempVideoPath = videoFile.path;
         const tempAudioPath = path.join("/tmp", `audio_${uuidv4()}.wav`);
-
-        fs.writeFileSync(tempVideoPath, videoBuffer);
 
         // Extract audio from video using ffmpeg
         const { spawn } = require("child_process");
@@ -315,7 +321,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Save video permanently
         const videoFilename = `${uuidv4()}.mp4`;
         const permanentVideoPath = path.join(UPLOADS_DIR, videoFilename);
-        fs.renameSync(tempVideoPath, permanentVideoPath);
+        fs.copyFileSync(tempVideoPath, permanentVideoPath);
+        fs.unlinkSync(tempVideoPath);
         const videoUrl = `/uploads/videos/${videoFilename}`;
 
         const structuringPrompt = `You are an AI assistant that analyzes home maintenance task descriptions.
@@ -365,12 +372,13 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
 
         let thumbnailUrl: string | null = null;
         if (thumbnailFile) {
-          const thumbFilename = `${uuidv4()}.png`;
+          const thumbFilename = `${uuidv4()}.jpg`;
           const thumbDir = path.join(process.cwd(), "uploads", "thumbnails");
           if (!fs.existsSync(thumbDir)) {
             fs.mkdirSync(thumbDir, { recursive: true });
           }
-          fs.writeFileSync(path.join(thumbDir, thumbFilename), thumbnailFile.buffer);
+          fs.copyFileSync(thumbnailFile.path, path.join(thumbDir, thumbFilename));
+          fs.unlinkSync(thumbnailFile.path);
           thumbnailUrl = `/uploads/thumbnails/${thumbFilename}`;
         }
 

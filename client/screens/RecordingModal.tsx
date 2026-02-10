@@ -11,7 +11,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import { Audio } from "expo-av";
-import { File } from "expo-file-system/next";
+import * as FileSystem from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -162,11 +162,19 @@ export default function RecordingModal() {
 
         const formData = new FormData();
 
-        const videoFile = new File(videoUri);
-        formData.append("video", videoFile as any);
+        const videoFileName = videoUri.split("/").pop() || "video.mov";
+        formData.append("video", {
+          uri: videoUri,
+          type: "video/quicktime",
+          name: videoFileName,
+        } as any);
 
-        const thumbnailFile = new File(thumbnailUri);
-        formData.append("thumbnail", thumbnailFile as any);
+        const thumbnailFileName = thumbnailUri.split("/").pop() || "thumbnail.jpg";
+        formData.append("thumbnail", {
+          uri: thumbnailUri,
+          type: "image/jpeg",
+          name: thumbnailFileName,
+        } as any);
 
         formData.append("householdId", String(session.householdId || ""));
 
