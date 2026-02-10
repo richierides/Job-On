@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import OpenAI, { toFile } from "openai";
 import { tasks, insertTaskSchema, updateTaskSchema, households, householdMembers, insertHouseholdSchema, insertHouseholdMemberSchema, savedPlans } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or, isNotNull } from "drizzle-orm";
 
 // Configure multer for file uploads (disk storage for large video files)
 const uploadTmpDir = path.join("/tmp", "uploads");
@@ -240,6 +240,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching member:", error);
       res.status(500).json({ error: "Failed to fetch member" });
+    }
+  });
+
+  // Get all households a member belongs to (by shared auth identity)
+  app.get("/api/members/:id/households", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const [member] = await db.select().from(householdMembers).where(eq(householdMembers.id, id));
+      if (!member) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+
+      let allMembers: typeof member[] = [];
+
+      if (member.email) {
+        allMembers = await db.select().from(householdMembers)
+          .where(eq(householdMembers.email, member.email));
+      } else if (member.authProvider && member.authProviderId) {
+        allMembers = await db.select().from(householdMembers)
+          .where(and(
+            eq(householdMembers.authProvider, member.authProvider),
+            eq(householdMembers.authProviderId, member.authProviderId),
+          ));
+      } else {
+        allMembers = [member];
+      }
+
+      const results = [];
+      for (const m of allMembers) {
+        if (m.householdId) {
+          const [h] = await db.select().from(households).where(eq(households.id, m.householdId));
+          if (h) {
+            results.push({
+              memberId: m.id,
+              memberName: m.name,
+              householdId: h.id,
+              householdName: h.name,
+              inviteCode: h.inviteCode,
+            });
+          }
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching member households:", error);
+      res.status(500).json({ error: "Failed to fetch households" });
     }
   });
 
