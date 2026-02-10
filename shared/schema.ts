@@ -35,13 +35,15 @@ export const insertHouseholdSchema = createInsertSchema(households).omit({
 export type Household = typeof households.$inferSelect;
 export type InsertHousehold = z.infer<typeof insertHouseholdSchema>;
 
-// Household Members Schema (optional email auth)
+// Household Members Schema (with auth provider support)
 export const householdMembers = pgTable("household_members", {
   id: serial("id").primaryKey(),
-  householdId: integer("household_id").notNull(),
+  householdId: integer("household_id"),
   name: text("name").notNull(),
   email: text("email").unique(),
   passwordHash: text("password_hash"),
+  authProvider: text("auth_provider"),
+  authProviderId: text("auth_provider_id"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
