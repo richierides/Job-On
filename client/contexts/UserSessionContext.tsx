@@ -5,6 +5,8 @@ import { HouseholdMember, Household } from "@shared/schema";
 interface UserSession {
   memberId: number | null;
   memberName: string | null;
+  memberEmail: string | null;
+  authProvider: string | null;
   householdId: number | null;
   householdName: string | null;
   inviteCode: string | null;
@@ -15,6 +17,7 @@ interface UserSessionContextType {
   isLoading: boolean;
   setSession: (session: Partial<UserSession>) => Promise<void>;
   clearSession: () => Promise<void>;
+  isAuthenticated: boolean;
   isOnboarded: boolean;
 }
 
@@ -23,6 +26,8 @@ const STORAGE_KEY = "@homefix_session";
 const defaultSession: UserSession = {
   memberId: null,
   memberName: null,
+  memberEmail: null,
+  authProvider: null,
   householdId: null,
   householdName: null,
   inviteCode: null,
@@ -42,7 +47,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
-        setSessionState(JSON.parse(stored));
+        setSessionState({ ...defaultSession, ...JSON.parse(stored) });
       }
     } catch (error) {
       console.error("Failed to load session:", error);
@@ -70,10 +75,11 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
+  const isAuthenticated = session.memberId !== null;
   const isOnboarded = session.memberId !== null && session.householdId !== null;
 
   return (
-    <UserSessionContext.Provider value={{ session, isLoading, setSession, clearSession, isOnboarded }}>
+    <UserSessionContext.Provider value={{ session, isLoading, setSession, clearSession, isAuthenticated, isOnboarded }}>
       {children}
     </UserSessionContext.Provider>
   );

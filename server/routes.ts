@@ -171,11 +171,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============ Household Member Endpoints ============
 
-  // Add member to household
+  // Add member to household (or link existing authenticated member)
   app.post("/api/households/:id/members", async (req: Request, res: Response) => {
     try {
       const householdId = parseInt(req.params.id as string);
-      const { name } = req.body;
+      const { name, existingMemberId } = req.body;
+
+      if (existingMemberId) {
+        const [updated] = await db.update(householdMembers)
+          .set({ householdId })
+          .where(eq(householdMembers.id, existingMemberId))
+          .returning();
+        if (!updated) {
+          return res.status(404).json({ error: "Member not found" });
+        }
+        return res.status(200).json(updated);
+      }
+
       if (!name) {
         return res.status(400).json({ error: "Member name is required" });
       }
