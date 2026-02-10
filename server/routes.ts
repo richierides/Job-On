@@ -436,37 +436,146 @@ Guidelines for planning:
 
   // ============ Auth Endpoints ============
 
-  app.post("/api/auth/register", async (req: Request, res: Response) => {
+  async function findOrCreateSSOUser(provider: string, providerId: string, email: string | null, name: string) {
+    const [existing] = await db.select().from(householdMembers)
+      .where(and(eq(householdMembers.authProvider, provider), eq(householdMembers.authProviderId, providerId)));
+    if (existing) {
+      const household = existing.householdId
+        ? (await db.select().from(households).where(eq(households.id, existing.householdId)))[0]
+        : null;
+      return { member: existing, household, isNew: false };
+    }
+
+    if (email) {
+      const [byEmail] = await db.select().from(householdMembers).where(eq(householdMembers.email, email.toLowerCase().trim()));
+      if (byEmail) {
+        const [updated] = await db.update(householdMembers)
+          .set({ authProvider: provider, authProviderId: providerId })
+          .where(eq(householdMembers.id, byEmail.id))
+          .returning();
+        const household = updated.householdId
+          ? (await db.select().from(households).where(eq(households.id, updated.householdId)))[0]
+          : null;
+        return { member: updated, household, isNew: false };
+      }
+    }
+
+    const [newMember] = await db.insert(householdMembers).values({
+      name,
+      email: email ? email.toLowerCase().trim() : null,
+      authProvider: provider,
+      authProviderId: providerId,
+      householdId: null,
+    }).returning();
+    return { member: newMember, household: null, isNew: true };
+  }
+
+  app.post("/api/auth/apple", async (req: Request, res: Response) => {
     try {
-      const { memberId, email, password } = req.body;
-      if (!memberId || !email || !password) {
-        return res.status(400).json({ error: "Member ID, email, and password are required" });
+      const { identityToken, user, fullName, email } = req.body;
+      if (!identityToken || !user) {
+        return res.status(400).json({ error: "Identity token and user ID are required" });
+      }
+
+      const name = fullName
+        ? [fullName.givenName, fullName.familyName].filter(Boolean).join(" ") || "User"
+        : "User";
+
+      const result = await findOrCreateSSOUser("apple", user, email || null, name);
+
+      res.json({
+        member: {
+          id: result.member.id,
+          name: result.member.name,
+          email: result.member.email,
+          householdId: result.member.householdId,
+          authProvider: result.member.authProvider,
+        },
+        household: result.household,
+        isNew: result.isNew,
+      });
+    } catch (error) {
+      console.error("Error with Apple sign in:", error);
+      res.status(500).json({ error: "Failed to sign in with Apple" });
+    }
+  });
+
+  app.post("/api/auth/google", async (req: Request, res: Response) => {
+    try {
+      const { idToken } = req.body;
+      if (!idToken) {
+        return res.status(400).json({ error: "ID token is required" });
+      }
+
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+      if (!response.ok) {
+        return res.status(401).json({ error: "Invalid Google token" });
+      }
+      const tokenData = await response.json();
+      const { sub: googleId, email, name } = tokenData;
+
+      if (!googleId) {
+        return res.status(401).json({ error: "Invalid Google token data" });
+      }
+
+      const result = await findOrCreateSSOUser("google", googleId, email || null, name || "User");
+
+      res.json({
+        member: {
+          id: result.member.id,
+          name: result.member.name,
+          email: result.member.email,
+          householdId: result.member.householdId,
+          authProvider: result.member.authProvider,
+        },
+        household: result.household,
+        isNew: result.isNew,
+      });
+    } catch (error) {
+      console.error("Error with Google sign in:", error);
+      res.status(500).json({ error: "Failed to sign in with Google" });
+    }
+  });
+
+  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+    try {
+      const { name, email, password } = req.body;
+      if (!name || !email || !password) {
+        return res.status(400).json({ error: "Name, email, and password are required" });
       }
       if (password.length < 6) {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
       }
 
-      const [existingMember] = await db.select().from(householdMembers).where(eq(householdMembers.id, memberId));
-      if (!existingMember) {
-        return res.status(404).json({ error: "Member not found" });
-      }
-
-      const [emailTaken] = await db.select().from(householdMembers).where(eq(householdMembers.email, email.toLowerCase().trim()));
-      if (emailTaken) {
-        return res.status(409).json({ error: "This email is already registered" });
+      const normalizedEmail = email.toLowerCase().trim();
+      const [existing] = await db.select().from(householdMembers).where(eq(householdMembers.email, normalizedEmail));
+      if (existing) {
+        return res.status(409).json({ error: "An account with this email already exists" });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
-      const [updated] = await db
-        .update(householdMembers)
-        .set({ email: email.toLowerCase().trim(), passwordHash })
-        .where(eq(householdMembers.id, memberId))
-        .returning();
+      const [newMember] = await db.insert(householdMembers).values({
+        name: name.trim(),
+        email: normalizedEmail,
+        passwordHash,
+        authProvider: "email",
+        householdId: null,
+      }).returning();
 
-      res.json({ success: true, member: { id: updated.id, name: updated.name, email: updated.email, householdId: updated.householdId } });
+      res.json({
+        member: {
+          id: newMember.id,
+          name: newMember.name,
+          email: newMember.email,
+          householdId: newMember.householdId,
+          authProvider: newMember.authProvider,
+        },
+        household: null,
+        isNew: true,
+      });
     } catch (error) {
-      console.error("Error registering:", error);
-      res.status(500).json({ error: "Failed to register account" });
+      console.error("Error signing up:", error);
+      res.status(500).json({ error: "Failed to create account" });
     }
   });
 
@@ -487,15 +596,59 @@ Guidelines for planning:
         return res.status(401).json({ error: "Invalid email or password" });
       }
 
-      const [household] = await db.select().from(households).where(eq(households.id, member.householdId));
+      const household = member.householdId
+        ? (await db.select().from(households).where(eq(households.id, member.householdId)))[0]
+        : null;
 
       res.json({
-        member: { id: member.id, name: member.name, email: member.email, householdId: member.householdId },
+        member: {
+          id: member.id,
+          name: member.name,
+          email: member.email,
+          householdId: member.householdId,
+          authProvider: member.authProvider,
+        },
         household: household || null,
+        isNew: false,
       });
     } catch (error) {
       console.error("Error logging in:", error);
       res.status(500).json({ error: "Failed to log in" });
+    }
+  });
+
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
+    try {
+      const { memberId, email, password } = req.body;
+      if (!memberId || !email || !password) {
+        return res.status(400).json({ error: "Member ID, email, and password are required" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const [existingMember] = await db.select().from(householdMembers).where(eq(householdMembers.id, memberId));
+      if (!existingMember) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const [emailTaken] = await db.select().from(householdMembers).where(eq(householdMembers.email, normalizedEmail));
+      if (emailTaken && emailTaken.id !== memberId) {
+        return res.status(409).json({ error: "This email is already registered" });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const [updated] = await db
+        .update(householdMembers)
+        .set({ email: normalizedEmail, passwordHash, authProvider: "email" })
+        .where(eq(householdMembers.id, memberId))
+        .returning();
+
+      res.json({ success: true, member: { id: updated.id, name: updated.name, email: updated.email, householdId: updated.householdId } });
+    } catch (error) {
+      console.error("Error registering:", error);
+      res.status(500).json({ error: "Failed to register account" });
     }
   });
 
