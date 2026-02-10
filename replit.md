@@ -1,8 +1,8 @@
-# HomeFix AI
+# Home DIY Tracker
 
 ## Overview
 
-HomeFix AI is a mobile-first application that helps homeowners document household repairs and maintenance tasks using voice and video. Users can record videos of issues around their home, and AI automatically transcribes the audio and generates structured "Job Cards" with titles, effort scores, locations, and priorities. The core interaction is "See it, Say it, Save it" - a hold-to-record camera interface that eliminates the need for manual data entry.
+Home DIY Tracker is a mobile-first application that helps homeowners document household repairs and maintenance tasks using voice and video. Users can record videos of issues around their home, and AI automatically transcribes the audio and generates structured "Job Cards" with titles, effort scores, locations, and priorities. The core interaction is "See it, Say it, Save it" - a hold-to-record camera interface that eliminates the need for manual data entry.
 
 ## User Preferences
 

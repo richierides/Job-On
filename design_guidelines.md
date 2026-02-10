@@ -1,8 +1,8 @@
-# HomeFix AI Design Guidelines
+# Home DIY Tracker Design Guidelines
 
 ## Brand Identity
 
-**Purpose**: HomeFix AI empowers homeowners to capture and manage household repairs effortlessly. The app transforms casual video observations into professional maintenance records.
+**Purpose**: Home DIY Tracker empowers homeowners to capture and manage household repairs effortlessly. The app transforms casual video observations into professional maintenance records.
 
 **Aesthetic Direction**: **Capable & Trustworthy** — A blueprint-inspired design that feels professional and approachable. Clean lines, confident typography, with a bright blue primary color (evoking blueprints, reliability, and clarity) and warm amber/orange as an action accent. The design prioritizes speed and clarity over decoration.
 
@@ -32,7 +32,7 @@
 **Purpose**: Central hub showing all maintenance tasks; primary access point for recording.
 
 **Layout**:
-- **Header**: Transparent background, app title "HomeFix" in bold custom font (left), settings icon button (right)
+- **Header**: Transparent background, app title "Home DIY Tracker" in bold custom font (left), settings icon button (right)
 - **Main Content**: 
   - Scrollable list (FlatList) of job cards
   - Safe area insets: top = headerHeight + 24px, bottom = 100px (room for floating button)

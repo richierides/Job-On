@@ -53,7 +53,7 @@ export const insertHouseholdMemberSchema = createInsertSchema(householdMembers).
 export type HouseholdMember = typeof householdMembers.$inferSelect;
 export type InsertHouseholdMember = z.infer<typeof insertHouseholdMemberSchema>;
 
-// HomeFix AI Tasks Schema
+// Home DIY Tracker Tasks Schema
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),

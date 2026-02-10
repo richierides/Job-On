@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "HomeFix AI",
-    "slug": "homefix-ai",
+    "name": "Home DIY Tracker",
+    "slug": "home-diy-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "homefixai",
+    "scheme": "homediytracker",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.homefix.ai",
       "infoPlist": {
-        "NSCameraUsageDescription": "HomeFix AI needs camera access to record videos of your home maintenance issues.",
-        "NSMicrophoneUsageDescription": "HomeFix AI needs microphone access to capture audio descriptions of your tasks."
+        "NSCameraUsageDescription": "Home DIY Tracker needs camera access to record videos of your home maintenance issues.",
+        "NSMicrophoneUsageDescription": "Home DIY Tracker needs microphone access to capture audio descriptions of your tasks."
       }
     },
     "android": {
@@ -50,8 +50,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "HomeFix AI needs camera access to record videos of your home maintenance issues.",
-          "microphonePermission": "HomeFix AI needs microphone access to capture audio descriptions of your tasks.",
+          "cameraPermission": "Home DIY Tracker needs camera access to record videos of your home maintenance issues.",
+          "microphonePermission": "Home DIY Tracker needs microphone access to capture audio descriptions of your tasks.",
           "recordAudioAndroid": true
         }
       ]

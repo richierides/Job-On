@@ -371,7 +371,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
         .map((m: any) => m.name)
         .join(", ");
 
-      const systemPrompt = `You are a friendly home maintenance planning assistant for the HomeFix app. You help homeowners create a sensible weekly plan for their pending tasks.
+      const systemPrompt = `You are a friendly home maintenance planning assistant for the Home DIY Tracker app. You help homeowners create a sensible weekly plan for their pending tasks.
 
 You have access to these pending tasks:
 ${taskSummary || "No tasks yet."}

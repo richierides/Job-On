@@ -56,7 +56,7 @@ export default function RootStackNavigator() {
             name="TaskDashboard"
             component={TaskDashboardScreen}
             options={({ navigation }) => ({
-              headerTitle: () => <HeaderTitle title="HomeFix" />,
+              headerTitle: () => <HeaderTitle title="Home DIY Tracker" />,
               headerRight: () => (
                 <HeaderButton
                   onPress={() => navigation.navigate("Settings")}

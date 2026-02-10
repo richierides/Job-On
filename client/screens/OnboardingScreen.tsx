@@ -162,7 +162,7 @@ export default function OnboardingScreen() {
     <View style={styles.content}>
       <View style={styles.header}>
         <Feather name="home" size={48} color={theme.primary} />
-        <ThemedText style={[styles.title, { color: theme.text }]}>Welcome to HomeFix</ThemedText>
+        <ThemedText style={[styles.title, { color: theme.text }]}>Welcome to Home DIY Tracker</ThemedText>
         <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
           Create a household to start tracking repairs, or join an existing one
         </ThemedText>

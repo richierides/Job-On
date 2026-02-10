@@ -232,7 +232,7 @@ export default function RecordingModal() {
           Camera & Microphone Access
         </ThemedText>
         <ThemedText style={[styles.permissionMessage, { color: theme.textSecondary }]}>
-          HomeFix AI needs camera and microphone access to record your home maintenance tasks.
+          Home DIY Tracker needs camera and microphone access to record your home maintenance tasks.
         </ThemedText>
 
         {needsSettings && Platform.OS !== "web" ? (

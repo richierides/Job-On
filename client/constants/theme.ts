@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-// HomeFix AI Color Palette - Blueprint Blue + Amber Accent
+// Home DIY Tracker Color Palette - Blueprint Blue + Amber Accent
 export const AppColors = {
   primary: "#2D8CFF",
   primaryDark: "#1A6FD4",
