@@ -155,35 +155,29 @@ export default function RecordingModal() {
       setIsProcessing(true);
 
       try {
-        // Generate thumbnail from first frame
         const { uri: thumbnailUri } = await VideoThumbnails.getThumbnailAsync(
           videoUri,
           { time: 0 }
         );
 
-        // Read video file as base64
+        const formData = new FormData();
+
         const videoFile = new File(videoUri);
-        const videoBase64 = await videoFile.base64();
+        formData.append("video", videoFile as any);
 
-        // Read thumbnail as base64
         const thumbnailFile = new File(thumbnailUri);
-        const thumbnailBase64 = await thumbnailFile.base64();
+        formData.append("thumbnail", thumbnailFile as any);
 
-        // Send to backend for AI processing
+        formData.append("householdId", String(session.householdId || ""));
+
         const response = await fetch(new URL("/api/tasks/process-video", getApiUrl()).href, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            video: videoBase64,
-            thumbnail: thumbnailBase64,
-            householdId: session.householdId,
-          }),
+          body: formData,
         });
 
         if (!response.ok) {
-          throw new Error("Failed to process video");
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.details || "Failed to process video");
         }
 
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

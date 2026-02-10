@@ -16,6 +16,12 @@ export function getApiUrl(): string {
   return url.href;
 }
 
+export function resolveMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("data:") || url.startsWith("http")) return url;
+  return `${getApiUrl()}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

@@ -23,7 +23,7 @@ import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
 import { Task, HouseholdMember, PRIORITIES, LOCATIONS, Priority, Location } from "@shared/schema";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl, resolveMediaUrl } from "@/lib/query-client";
 import { useUserSession } from "@/contexts/UserSessionContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import type { VideoPlayer } from "expo-video";
@@ -80,9 +80,7 @@ export default function TaskDetailScreen() {
   const [newShoppingItem, setNewShoppingItem] = useState("");
   const [showVideo, setShowVideo] = useState(false);
 
-  const videoSource = initialTask.videoUrl
-    ? `${getApiUrl()}${initialTask.videoUrl}`
-    : null;
+  const videoSource = resolveMediaUrl(initialTask.videoUrl) || null;
 
   const player = useVideoPlayer(videoSource, (p: VideoPlayer) => {
     p.loop = false;
@@ -322,7 +320,7 @@ export default function TaskDetailScreen() {
             }}
           >
             <Image
-              source={{ uri: initialTask.thumbnailUrl }}
+              source={{ uri: resolveMediaUrl(initialTask.thumbnailUrl) || "" }}
               style={styles.thumbnail}
               resizeMode="cover"
             />

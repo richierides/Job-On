@@ -10,6 +10,7 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import { resolveMediaUrl } from "@/lib/query-client";
 import { Task } from "@shared/schema";
 
 interface JobCardProps {
@@ -85,7 +86,7 @@ export function JobCard({ task, onPress }: JobCardProps) {
       <View style={styles.thumbnailContainer}>
         {task.thumbnailUrl ? (
           <Image
-            source={{ uri: task.thumbnailUrl }}
+            source={{ uri: resolveMediaUrl(task.thumbnailUrl) || "" }}
             style={styles.thumbnail}
             resizeMode="cover"
           />

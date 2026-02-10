@@ -6,6 +6,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Chip, getChipVariantForPriority, getChipVariantForStatus, getChipVariantForEffort } from "@/components/Chip";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
+import { resolveMediaUrl } from "@/lib/query-client";
 import { Task } from "@shared/schema";
 
 interface TaskCardProps {
@@ -51,7 +52,7 @@ export function TaskCard({ task, assigneeName, onPress, onPropertyPress }: TaskC
       <View style={styles.cardHeader}>
         {task.thumbnailUrl ? (
           <Image
-            source={{ uri: task.thumbnailUrl }}
+            source={{ uri: resolveMediaUrl(task.thumbnailUrl) || "" }}
             style={styles.thumbnail}
             contentFit="cover"
           />

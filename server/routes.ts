@@ -236,20 +236,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============ Video Processing Endpoint ============
 
   // Process video and create task using AI
+  const videoUpload = upload.fields([
+    { name: "video", maxCount: 1 },
+    { name: "thumbnail", maxCount: 1 },
+  ]);
+
   app.post(
     "/api/tasks/process-video",
+    videoUpload,
     async (req: Request, res: Response) => {
       try {
-        const { video, thumbnail, householdId } = req.body;
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+        const videoFile = files?.video?.[0];
+        const thumbnailFile = files?.thumbnail?.[0];
+        const householdId = req.body.householdId;
 
-        if (!video) {
-          return res.status(400).json({ error: "Video data is required" });
+        if (!videoFile) {
+          return res.status(400).json({ error: "Video file is required" });
         }
 
-        // Convert base64 video to buffer for audio extraction
-        const videoBuffer = Buffer.from(video, "base64");
+        const videoBuffer = videoFile.buffer;
 
-        // Save video temporarily for ffmpeg processing
         const tempVideoPath = path.join("/tmp", `video_${uuidv4()}.mp4`);
         const tempAudioPath = path.join("/tmp", `audio_${uuidv4()}.wav`);
 
@@ -340,10 +347,16 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           };
         }
 
-        // Save thumbnail as data URL if provided
-        const thumbnailUrl = thumbnail
-          ? `data:image/png;base64,${thumbnail}`
-          : null;
+        let thumbnailUrl: string | null = null;
+        if (thumbnailFile) {
+          const thumbFilename = `${uuidv4()}.png`;
+          const thumbDir = path.join(process.cwd(), "uploads", "thumbnails");
+          if (!fs.existsSync(thumbDir)) {
+            fs.mkdirSync(thumbDir, { recursive: true });
+          }
+          fs.writeFileSync(path.join(thumbDir, thumbFilename), thumbnailFile.buffer);
+          thumbnailUrl = `/uploads/thumbnails/${thumbFilename}`;
+        }
 
         const subtasks = Array.isArray(taskData.subtasks)
           ? taskData.subtasks.map((s: any) => ({ title: String(s.title || ""), completed: false }))
@@ -371,9 +384,10 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           .returning();
 
         res.status(201).json(newTask);
-      } catch (error) {
-        console.error("Error processing video:", error);
-        res.status(500).json({ error: "Failed to process video" });
+      } catch (error: any) {
+        console.error("Error processing video:", error?.message || error);
+        console.error("Stack:", error?.stack);
+        res.status(500).json({ error: "Failed to process video", details: error?.message || "Unknown error" });
       }
     }
   );
