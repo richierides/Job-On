@@ -16,18 +16,18 @@ interface ChipProps {
 
 const variantColors = {
   default: { bg: "rgba(0,0,0,0.06)", text: undefined },
-  primary: { bg: "rgba(255,107,53,0.12)", text: "#FF6B35" },
-  success: { bg: "rgba(16,185,129,0.12)", text: "#10B981" },
-  warning: { bg: "rgba(245,158,11,0.12)", text: "#D97706" },
+  primary: { bg: "rgba(45,140,255,0.12)", text: "#2D8CFF" },
+  success: { bg: "rgba(52,199,89,0.12)", text: "#34C759" },
+  warning: { bg: "rgba(245,166,35,0.12)", text: "#D97706" },
   error: { bg: "rgba(239,68,68,0.12)", text: "#EF4444" },
   muted: { bg: "rgba(0,0,0,0.04)", text: undefined },
 };
 
 const darkVariantColors = {
   default: { bg: "rgba(255,255,255,0.08)", text: undefined },
-  primary: { bg: "rgba(255,107,53,0.2)", text: "#FF8A5C" },
-  success: { bg: "rgba(16,185,129,0.2)", text: "#34D399" },
-  warning: { bg: "rgba(245,158,11,0.2)", text: "#FBBF24" },
+  primary: { bg: "rgba(45,140,255,0.2)", text: "#5DA8FF" },
+  success: { bg: "rgba(52,199,89,0.2)", text: "#5BD97A" },
+  warning: { bg: "rgba(245,166,35,0.2)", text: "#FBBF24" },
   error: { bg: "rgba(239,68,68,0.2)", text: "#F87171" },
   muted: { bg: "rgba(255,255,255,0.06)", text: undefined },
 };

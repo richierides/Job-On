@@ -4,9 +4,9 @@
 
 **Purpose**: HomeFix AI empowers homeowners to capture and manage household repairs effortlessly. The app transforms casual video observations into professional maintenance records.
 
-**Aesthetic Direction**: **Capable & Trustworthy** — A utility-first design that feels professional without being sterile. Think industrial-inspired with warm touches: clean lines, confident typography, strategic use of orange/amber as an action color (evoking tools, safety, and urgency). The design prioritizes speed and clarity over decoration.
+**Aesthetic Direction**: **Capable & Trustworthy** — A blueprint-inspired design that feels professional and approachable. Clean lines, confident typography, with a bright blue primary color (evoking blueprints, reliability, and clarity) and warm amber/orange as an action accent. The design prioritizes speed and clarity over decoration.
 
-**Memorable Element**: The **pulsing record button** — a large, unmissable circular button with a glowing amber border that pulses when held. This is the heart of the "See it, Say it, Save it" experience.
+**Memorable Element**: The **pulsing record button** — a large, unmissable circular button in warm amber/orange that pulses when held. This is the heart of the "See it, Say it, Save it" experience.
 
 ---
 
@@ -91,15 +91,16 @@
 
 ## Color Palette
 
-**Primary**: `#FF6B35` (Amber Orange) — Tools, action, urgency  
-**Primary Dark**: `#D94E1F`  
-**Background**: `#FAFAFA` (Light mode), `#1A1A1A` (Dark mode)  
-**Surface**: `#FFFFFF` (Light), `#2A2A2A` (Dark)  
+**Primary**: `#2D8CFF` (Blueprint Blue) — Structure, reliability, clarity  
+**Primary Dark**: `#1A6FD4`  
+**Accent**: `#FF8C2E` (Amber Orange) — Action, record button, highlights  
+**Background**: `#F5F8FC` (Light mode), `#121820` (Dark mode)  
+**Surface**: `#FFFFFF` (Light), `#1C2530` (Dark)  
 **Text Primary**: `#1A1A1A` (Light), `#FAFAFA` (Dark)  
 **Text Secondary**: `#666666` (Light), `#A0A0A0` (Dark)  
-**Border**: `#E0E0E0` (Light), `#3A3A3A` (Dark)  
-**Success**: `#10B981`  
-**Warning**: `#F59E0B`  
+**Border**: `#D4DFEC` (Light), `#2E3B4D` (Dark)  
+**Success**: `#34C759`  
+**Warning**: `#F5A623`  
 **Error**: `#EF4444`
 
 ---

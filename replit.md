@@ -79,6 +79,7 @@ Preferred communication style: Simple, everyday language.
 - Google Fonts: Manrope and Nunito loaded via `@expo-google-fonts`
 
 ## Recent Changes
+- Design refresh: Updated color palette from orange primary to blueprint blue (#2D8CFF) with amber/orange accent (#FF8C2E) to match new app icon. Updated all theme colors, Chip variants, backgrounds, borders. Record button uses accent orange. App icon, splash, favicon all updated.
 - Recording overlay: "What to mention" bullet points displayed over camera view, fades out during recording
 - Materials List tab: Dashboard has Tasks/Materials List tabs; Materials List aggregates shopping items across all tasks with task attribution
 - Plan My Work: Chat-based AI planning assistant (PlanScreen) with split layout - scrollable plan area above, chat input anchored at bottom. Backend POST /api/plan/chat endpoint uses GPT-4o to generate structured weekly plans. AI asks 2-3 setup questions (start date, availability per person) then generates collapsible week-by-week plan cards with task assignments, time estimates, and day scheduling. Users can refine plans through follow-up chat messages.
