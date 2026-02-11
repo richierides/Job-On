@@ -90,6 +90,10 @@ Preferred communication style: Simple, everyday language.
 - Keyboard dismiss: Swiping down the chat panel in Plan screen dismisses the keyboard; tapping the chat ribbon reopens the panel.
 - Video playback: Recorded videos are saved to disk (uploads/videos/) and served via /uploads static route. Task detail screen shows play button overlay on thumbnail; tapping opens inline video player using expo-video with native controls, fullscreen, and PiP support.
 - Auth system: Apple Sign-In (iOS), Google Sign-In (OAuth), and email signup/login. Auth-first onboarding flow. Database tracks authProvider and authProviderId on householdMembers.
+- Onboarding progress bar: Thin 3-segment blue strip at top of onboarding screen showing Step 1 (Account) → Step 2 (Household) → Step 3 (Invite). Labels below bar indicate current step.
+- Invite sharing: After household creation in onboarding, users see an "invite-success" screen with Share Invite (native share sheet), Copy Code (clipboard), and Continue buttons. Also available from Settings → Household → Invite Members modal.
+- Household management: Settings → Household section with Switch, Create, Join, and Invite Members options using modals. PATCH /api/members/:id endpoint for updating member auth info. GET /api/members/:id/households for fetching all households a member belongs to.
+- Task generation timing: Server-side performance monitoring logs timing for each phase (audio extraction, Whisper transcription, GPT-4o structuring, total). Timings returned in API response as `_timings` field.
 
 ## Roadmap (Upcoming Features)
 - Task dependencies (tag tasks that depend on others)
