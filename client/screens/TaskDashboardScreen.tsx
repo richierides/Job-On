@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useMemo } from "react";
-import { ScrollView, RefreshControl, StyleSheet, View, Pressable } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -219,26 +219,50 @@ export default function TaskDashboardScreen() {
     setShowFilters((prev) => !prev);
   }, []);
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          {
-            paddingTop: headerHeight + Spacing.lg,
-            paddingBottom: insets.bottom + 100,
-          },
-        ]}
-        scrollIndicatorInsets={{ bottom: insets.bottom }}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={refetch}
-            tintColor={AppColors.primary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
+  const renderTaskItem = useCallback(
+    ({ item: task }: { item: Task }) => (
+      <TaskCard
+        task={task}
+        assigneeName={task.assignedToId ? membersMap[task.assignedToId] : undefined}
+        onPress={() => handleTaskPress(task)}
+        onPropertyPress={(propertyType) => openPicker(task, propertyType)}
+      />
+    ),
+    [membersMap, handleTaskPress, openPicker]
+  );
+
+  const renderMaterialItem = useCallback(
+    ({ item: mat, index }: { item: typeof aggregatedMaterials[0]; index: number }) => (
+      <Pressable
+        style={[styles.materialRow, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}
+        onPress={() => {
+          const task = tasks.find((t) => t.id === mat.taskId);
+          if (task) handleTaskPress(task);
+        }}
+        testID={`material-item-${index}`}
       >
+        <Feather
+          name={mat.checked ? "check-square" : "square"}
+          size={20}
+          color={mat.checked ? AppColors.success : theme.textSecondary}
+        />
+        <View style={styles.materialInfo}>
+          <ThemedText style={[styles.materialName, mat.checked ? styles.materialChecked : null]}>
+            {mat.item}
+          </ThemedText>
+          <ThemedText style={[styles.materialTask, { color: theme.textSecondary }]}>
+            {mat.taskTitle}
+          </ThemedText>
+        </View>
+        <Feather name="chevron-right" size={16} color={theme.textSecondary} />
+      </Pressable>
+    ),
+    [theme, tasks, handleTaskPress]
+  );
+
+  const listHeader = useMemo(
+    () => (
+      <>
         <Pressable
           style={[styles.filterToggle, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}
           onPress={toggleFilters}
@@ -328,64 +352,93 @@ export default function TaskDashboardScreen() {
             <Feather name="archive" size={18} color={theme.textSecondary} />
           </Pressable>
         </View>
+      </>
+    ),
+    [theme, showFilters, activeFilterCount, filters, members, activeTab, toggleFilters, navigation]
+  );
 
-        {activeTab === "tasks" ? (
-          filteredTasks.length === 0 && !isLoading ? (
-            <EmptyState
-              title={activeFilterCount > 0 ? "No Matching Tasks" : "No Tasks Yet"}
-              message={
-                activeFilterCount > 0
-                  ? "Try adjusting your filters to see more tasks"
-                  : "Tap the record button below to capture your first home maintenance task"
-              }
+  const taskKeyExtractor = useCallback((item: Task) => String(item.id), []);
+  const materialKeyExtractor = useCallback(
+    (item: typeof aggregatedMaterials[0], index: number) => `${item.taskId}-${index}`,
+    []
+  );
+
+  const emptyTaskComponent = useMemo(
+    () => (
+      <EmptyState
+        title={activeFilterCount > 0 ? "No Matching Tasks" : "No Tasks Yet"}
+        message={
+          activeFilterCount > 0
+            ? "Try adjusting your filters to see more tasks"
+            : "Tap the record button below to capture your first home maintenance task"
+        }
+      />
+    ),
+    [activeFilterCount]
+  );
+
+  const emptyMaterialComponent = useMemo(
+    () => (
+      <EmptyState
+        title="No Materials Yet"
+        message="Materials mentioned in your task recordings will appear here"
+      />
+    ),
+    []
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      {activeTab === "tasks" ? (
+        <FlatList
+          data={filteredTasks}
+          renderItem={renderTaskItem}
+          keyExtractor={taskKeyExtractor}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={isLoading ? null : emptyTaskComponent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: headerHeight + Spacing.lg,
+              paddingBottom: insets.bottom + 100,
+            },
+          ]}
+          scrollIndicatorInsets={{ bottom: insets.bottom }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={refetch}
+              tintColor={AppColors.primary}
             />
-          ) : (
-            filteredTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                assigneeName={task.assignedToId ? membersMap[task.assignedToId] : undefined}
-                onPress={() => handleTaskPress(task)}
-                onPropertyPress={(propertyType) => openPicker(task, propertyType)}
-              />
-            ))
-          )
-        ) : aggregatedMaterials.length === 0 ? (
-          <EmptyState
-            title="No Materials Yet"
-            message="Materials mentioned in your task recordings will appear here"
-          />
-        ) : (
-          <View style={styles.materialsContainer}>
-            {aggregatedMaterials.map((mat, index) => (
-              <Pressable
-                key={`${mat.taskId}-${index}`}
-                style={[styles.materialRow, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}
-                onPress={() => {
-                  const task = tasks.find((t) => t.id === mat.taskId);
-                  if (task) handleTaskPress(task);
-                }}
-                testID={`material-item-${index}`}
-              >
-                <Feather
-                  name={mat.checked ? "check-square" : "square"}
-                  size={20}
-                  color={mat.checked ? AppColors.success : theme.textSecondary}
-                />
-                <View style={styles.materialInfo}>
-                  <ThemedText style={[styles.materialName, mat.checked ? styles.materialChecked : null]}>
-                    {mat.item}
-                  </ThemedText>
-                  <ThemedText style={[styles.materialTask, { color: theme.textSecondary }]}>
-                    {mat.taskTitle}
-                  </ThemedText>
-                </View>
-                <Feather name="chevron-right" size={16} color={theme.textSecondary} />
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <FlatList
+          data={aggregatedMaterials}
+          renderItem={renderMaterialItem}
+          keyExtractor={materialKeyExtractor}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={emptyMaterialComponent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: headerHeight + Spacing.lg,
+              paddingBottom: insets.bottom + 100,
+            },
+          ]}
+          scrollIndicatorInsets={{ bottom: insets.bottom }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={refetch}
+              tintColor={AppColors.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+        />
+      )}
 
       <FloatingRecordButton
         onPress={handleRecordPress}
