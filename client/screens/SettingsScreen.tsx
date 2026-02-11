@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, Pressable, Linking, useColorScheme, Platform, Modal, TextInput, ActivityIndicator, FlatList } from "react-native";
+import { View, StyleSheet, Pressable, Linking, useColorScheme, Platform, Modal, TextInput, ActivityIndicator, FlatList, Share } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Clipboard from "expo-clipboard";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -64,7 +65,7 @@ interface HouseholdEntry {
   inviteCode: string;
 }
 
-type ModalType = "switch" | "create" | "join" | null;
+type ModalType = "switch" | "create" | "join" | "invite" | null;
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -80,6 +81,7 @@ export default function SettingsScreen() {
   const [joinCode, setJoinCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const handleOpenWebsite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -362,6 +364,60 @@ export default function SettingsScreen() {
       );
     }
 
+    if (activeModal === "invite") {
+      const code = session.inviteCode || "------";
+      const shareMessage = `Join my household "${session.householdName}" on Home DIY Tracker! Use invite code: ${code}`;
+
+      return (
+        <View style={[styles.modalCard, { backgroundColor: theme.backgroundDefault }]}>
+          <View style={styles.modalHeader}>
+            <ThemedText style={styles.modalTitle}>Invite Members</ThemedText>
+            <Pressable onPress={closeModal} hitSlop={12}>
+              <Feather name="x" size={22} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+          <ThemedText style={[styles.modalHint, { color: theme.textSecondary }]}>
+            Share this code so others can join your household.
+          </ThemedText>
+          <View style={styles.inviteCodeBox}>
+            <ThemedText style={[styles.inviteCodeDisplay, { color: theme.text }]}>{code}</ThemedText>
+          </View>
+          <View style={{ gap: Spacing.sm }}>
+            <Pressable
+              testID="button-share-invite"
+              style={[styles.actionButton, { backgroundColor: AppColors.primary }]}
+              onPress={async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                try {
+                  await Share.share({ message: shareMessage });
+                } catch {}
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                <Feather name="share" size={18} color="#FFFFFF" />
+                <ThemedText style={styles.actionButtonText}>Share Invite</ThemedText>
+              </View>
+            </Pressable>
+            <Pressable
+              testID="button-copy-code"
+              style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary, borderWidth: 1, borderColor: theme.border }]}
+              onPress={async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                await Clipboard.setStringAsync(code);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                <Feather name={copied ? "check" : "copy"} size={18} color={theme.text} />
+                <ThemedText style={[styles.actionButtonText, { color: theme.text }]}>{copied ? "Copied!" : "Copy Code"}</ThemedText>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
     return null;
   };
 
@@ -433,6 +489,12 @@ export default function SettingsScreen() {
               title="Create New Household"
               subtitle="Start a new household group"
               onPress={() => { setErrorMessage(""); setActiveModal("create"); }}
+            />
+            <SettingsRow
+              icon="send"
+              title="Invite Members"
+              subtitle="Share your invite code"
+              onPress={() => { setCopied(false); setActiveModal("invite"); }}
             />
             <SettingsRow
               icon="user-plus"
@@ -613,6 +675,16 @@ const styles = StyleSheet.create({
   householdCode: {
     fontSize: Typography.small.fontSize,
     marginTop: 2,
+  },
+  inviteCodeBox: {
+    alignItems: "center",
+    paddingVertical: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  inviteCodeDisplay: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: 6,
   },
   actionButton: {
     borderRadius: BorderRadius.sm,

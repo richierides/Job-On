@@ -9,7 +9,9 @@ import {
   Platform,
   ScrollView,
   Image,
+  Share,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -39,7 +41,8 @@ type OnboardingStep =
   | "login-email"
   | "household-choice"
   | "create"
-  | "join";
+  | "join"
+  | "invite-success";
 
 const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -66,6 +69,8 @@ export default function OnboardingScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
+  const [createdHousehold, setCreatedHousehold] = useState<{ memberId: number; householdId: number; householdName: string; inviteCode: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const redirectUri = AuthSession.makeRedirectUri({ preferLocalhost: true });
 
@@ -230,12 +235,13 @@ export default function OnboardingScreen() {
       const member = await memberResponse.json() as HouseholdMember;
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await setSession({
+      setCreatedHousehold({
         memberId: member.id,
         householdId: household.id,
         householdName: household.name,
         inviteCode: household.inviteCode,
       });
+      setStep("invite-success");
     } catch (err) {
       setError("Failed to create household. Please try again.");
     } finally {
@@ -277,9 +283,50 @@ export default function OnboardingScreen() {
     setError(null);
     if (step === "signup-email" || step === "login-email") {
       setStep("welcome");
-    } else if (step === "create" || step === "join") {
+    } else if (step === "create" || step === "join" || step === "invite-success") {
       setStep("household-choice");
     }
+  };
+
+  const getProgressStage = (): { stage: number; label: string } => {
+    if (step === "welcome" || step === "signup-email" || step === "login-email") {
+      return { stage: 1, label: "Account" };
+    }
+    if (step === "household-choice" || step === "create" || step === "join") {
+      return { stage: 2, label: "Household" };
+    }
+    if (step === "invite-success") {
+      return { stage: 3, label: "Invite" };
+    }
+    return { stage: 1, label: "Account" };
+  };
+
+  const { stage: currentStage, label: stageLabel } = getProgressStage();
+
+  const handleShareInvite = async () => {
+    if (!createdHousehold) return;
+    try {
+      await Share.share({
+        message: `Join my household on Home DIY Tracker! Use invite code: ${createdHousehold.inviteCode}`,
+      });
+    } catch (_) {}
+  };
+
+  const handleCopyCode = async () => {
+    if (!createdHousehold) return;
+    await Clipboard.setStringAsync(createdHousehold.inviteCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleContinueAfterInvite = async () => {
+    if (!createdHousehold) return;
+    await setSession({
+      memberId: createdHousehold.memberId,
+      householdId: createdHousehold.householdId,
+      householdName: createdHousehold.householdName,
+      inviteCode: createdHousehold.inviteCode,
+    });
   };
 
   const renderWelcome = () => (
@@ -626,8 +673,73 @@ export default function OnboardingScreen() {
     </View>
   );
 
+  const renderInviteSuccess = () => (
+    <View style={styles.content}>
+      <View style={styles.header}>
+        <Feather name="check-circle" size={48} color={theme.primary} />
+        <ThemedText style={[styles.title, { color: theme.text }]}>Household Created!</ThemedText>
+        <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+          Share this code so others can join your household
+        </ThemedText>
+      </View>
+
+      <View style={styles.inviteCodeContainer}>
+        <ThemedText style={[styles.inviteCodeText, { color: theme.text }]}>
+          {createdHousehold?.inviteCode}
+        </ThemedText>
+      </View>
+
+      <View style={styles.buttonGroup}>
+        <Pressable
+          style={[styles.secondaryButton, { borderColor: theme.border }]}
+          onPress={handleShareInvite}
+          testID="button-share-invite"
+        >
+          <Feather name="share" size={20} color={theme.text} />
+          <ThemedText style={[styles.secondaryButtonText, { color: theme.text }]}>Share Invite</ThemedText>
+        </Pressable>
+
+        <Pressable
+          style={[styles.secondaryButton, { borderColor: theme.border }]}
+          onPress={handleCopyCode}
+          testID="button-copy-code"
+        >
+          <Feather name={copied ? "check" : "copy"} size={20} color={theme.text} />
+          <ThemedText style={[styles.secondaryButtonText, { color: theme.text }]}>
+            {copied ? "Copied!" : "Copy Code"}
+          </ThemedText>
+        </Pressable>
+
+        <Pressable
+          style={[styles.primaryButton, { backgroundColor: theme.primary }]}
+          onPress={handleContinueAfterInvite}
+          testID="button-continue"
+        >
+          <Feather name="arrow-right" size={20} color="#FFFFFF" />
+          <ThemedText style={styles.primaryButtonText}>Continue</ThemedText>
+        </Pressable>
+      </View>
+    </View>
+  );
+
   return (
-    <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl }]}>
+    <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.xl }]}>
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          {[1, 2, 3].map((seg) => (
+            <View
+              key={seg}
+              style={[
+                styles.progressSegment,
+                { backgroundColor: seg <= currentStage ? AppColors.primary : theme.border },
+              ]}
+            />
+          ))}
+        </View>
+        <ThemedText style={[styles.progressLabel, { color: theme.textSecondary }]}>
+          {`Step ${currentStage} of 3 — ${stageLabel}`}
+        </ThemedText>
+      </View>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -639,6 +751,7 @@ export default function OnboardingScreen() {
           {step === "household-choice" ? renderHouseholdChoice() : null}
           {step === "create" ? renderCreate() : null}
           {step === "join" ? renderJoin() : null}
+          {step === "invite-success" ? renderInviteSuccess() : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>
@@ -784,5 +897,34 @@ const styles = StyleSheet.create({
   signInTextBold: {
     fontSize: FontSizes.sm,
     fontWeight: "600",
+  },
+  progressContainer: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+  progressBar: {
+    flexDirection: "row",
+    gap: 3,
+    height: 4,
+  },
+  progressSegment: {
+    flex: 1,
+    borderRadius: 2,
+  },
+  progressLabel: {
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 6,
+  },
+  inviteCodeContainer: {
+    alignItems: "center",
+    marginBottom: Spacing["3xl"],
+  },
+  inviteCodeText: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: 6,
+    textAlign: "center",
   },
 });
