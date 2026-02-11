@@ -327,6 +327,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     videoUpload,
     async (req: Request, res: Response) => {
       try {
+        const timings: Record<string, number> = {};
+        const totalStart = Date.now();
         const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
         const videoFile = files?.video?.[0];
         const thumbnailFile = files?.thumbnail?.[0];
@@ -343,10 +345,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           path: videoFile.path,
         });
 
+        timings.uploadSizeMB = Math.round((videoFile.size / (1024 * 1024)) * 100) / 100;
+
         const tempVideoPath = videoFile.path;
         const tempAudioPath = path.join("/tmp", `audio_${uuidv4()}.wav`);
 
         // Extract audio from video using ffmpeg
+        let phaseStart = Date.now();
         const { spawn } = require("child_process");
         await new Promise<void>((resolve, reject) => {
           const ffmpeg = spawn("ffmpeg", [
@@ -374,10 +379,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ffmpeg.on("error", reject);
         });
 
+        timings.audioExtractionMs = Date.now() - phaseStart;
+
         // Read audio file
         const audioBuffer = fs.readFileSync(tempAudioPath);
 
         // Transcribe audio using OpenAI Whisper
+        phaseStart = Date.now();
         const audioFile = await toFile(audioBuffer, "audio.wav");
         const transcription = await openai.audio.transcriptions.create({
           file: audioFile,
@@ -385,6 +393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         const transcript = transcription.text;
+        timings.whisperTranscriptionMs = Date.now() - phaseStart;
 
         // Clean up temp audio file
         fs.unlinkSync(tempAudioPath);
@@ -413,6 +422,7 @@ Respond with a JSON object containing:
 
 Respond ONLY with valid JSON, no markdown or explanation.`;
 
+        phaseStart = Date.now();
         const completion = await openai.chat.completions.create({
           model: "gpt-4o",
           messages: [
@@ -422,6 +432,8 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           response_format: { type: "json_object" },
           max_completion_tokens: 1500,
         });
+
+        timings.gpt4oStructuringMs = Date.now() - phaseStart;
 
         const aiResponse = completion.choices[0]?.message?.content || "{}";
         let taskData;
@@ -478,7 +490,17 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           })
           .returning();
 
-        res.status(201).json(newTask);
+        timings.totalMs = Date.now() - totalStart;
+
+        console.log("Task generation timing:", {
+          uploadSizeMB: timings.uploadSizeMB,
+          audioExtractionMs: timings.audioExtractionMs,
+          whisperTranscriptionMs: timings.whisperTranscriptionMs,
+          gpt4oStructuringMs: timings.gpt4oStructuringMs,
+          totalMs: timings.totalMs,
+        });
+
+        res.status(201).json({ ...newTask, _timings: timings });
       } catch (error: any) {
         console.error("Error processing video:", error?.message || error);
         console.error("Stack:", error?.stack);
