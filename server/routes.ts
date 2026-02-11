@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import { createServer, type Server } from "node:http";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
@@ -38,17 +38,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.use("/uploads", require("express").static(path.join(process.cwd(), "uploads")));
-
-  // Increase JSON body limit for base64 videos
-  app.use((req, res, next) => {
-    if (req.path === "/api/tasks/process-video") {
-      // Skip default body parser for this route
-      next();
-    } else {
-      next();
-    }
-  });
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
   // ============ Task CRUD Endpoints ============
 
@@ -401,8 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Save video permanently
         const videoFilename = `${uuidv4()}.mp4`;
         const permanentVideoPath = path.join(UPLOADS_DIR, videoFilename);
-        fs.copyFileSync(tempVideoPath, permanentVideoPath);
-        fs.unlinkSync(tempVideoPath);
+        fs.renameSync(tempVideoPath, permanentVideoPath);
         const videoUrl = `/uploads/videos/${videoFilename}`;
 
         const structuringPrompt = `You are an AI assistant that analyzes home maintenance task descriptions.
@@ -460,8 +449,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           if (!fs.existsSync(thumbDir)) {
             fs.mkdirSync(thumbDir, { recursive: true });
           }
-          fs.copyFileSync(thumbnailFile.path, path.join(thumbDir, thumbFilename));
-          fs.unlinkSync(thumbnailFile.path);
+          fs.renameSync(thumbnailFile.path, path.join(thumbDir, thumbFilename));
           thumbnailUrl = `/uploads/thumbnails/${thumbFilename}`;
         }
 

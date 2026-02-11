@@ -22,6 +22,7 @@ import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
 import { Task } from "@shared/schema";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { formatMinutes, getPriorityColor, findMatchingTask } from "@/lib/utils";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -44,31 +45,6 @@ interface SavedPlan {
     }[];
   };
   createdAt: string;
-}
-
-function formatMinutes(mins: number): string {
-  if (mins < 60) return `${mins}min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
-
-function findMatchingTask(taskTitle: string, tasks: Task[]): Task | null {
-  const normalized = taskTitle.toLowerCase().trim();
-  return tasks.find((t) => t.title.toLowerCase().trim() === normalized) || null;
-}
-
-function getPriorityColor(priority: string): string {
-  switch (priority) {
-    case "High":
-      return AppColors.error;
-    case "Medium":
-      return AppColors.warning;
-    case "Low":
-      return AppColors.success;
-    default:
-      return AppColors.primary;
-  }
 }
 
 export default function SavedPlansScreen() {

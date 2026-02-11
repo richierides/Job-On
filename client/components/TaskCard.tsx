@@ -8,6 +8,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { resolveMediaUrl } from "@/lib/query-client";
 import { Task } from "@shared/schema";
+import { formatDuration } from "@/lib/utils";
 
 interface TaskCardProps {
   task: Task;
@@ -16,7 +17,7 @@ interface TaskCardProps {
   onPropertyPress: (propertyType: "priority" | "status" | "location" | "effort" | "assignee") => void;
 }
 
-export function TaskCard({ task, assigneeName, onPress, onPropertyPress }: TaskCardProps) {
+function TaskCardInner({ task, assigneeName, onPress, onPropertyPress }: TaskCardProps) {
   const { theme } = useTheme();
 
   const subtasks = (task as any).subtasks as { title: string; completed: boolean }[] | null;
@@ -24,13 +25,6 @@ export function TaskCard({ task, assigneeName, onPress, onPropertyPress }: TaskC
   const subtasksDone = subtasks?.filter((s) => s.completed).length || 0;
   const shoppingList = (task as any).shoppingList as { item: string; checked: boolean }[] | null;
   const shoppingCount = shoppingList?.length || 0;
-
-  const formatTime = (minutes: number) => {
-    if (minutes < 60) return `${minutes}m`;
-    const hrs = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-  };
 
   const formatDate = (date: Date | string | null) => {
     if (!date) return null;
@@ -107,7 +101,7 @@ export function TaskCard({ task, assigneeName, onPress, onPropertyPress }: TaskC
             <View style={styles.metaItem}>
               <Feather name="clock" size={13} color={theme.textSecondary} />
               <ThemedText style={[styles.metaText, { color: theme.textSecondary }]}>
-                {formatTime((task as any).estimatedMinutes)}
+                {formatDuration((task as any).estimatedMinutes)}
               </ThemedText>
             </View>
           ) : null}
@@ -163,6 +157,8 @@ export function TaskCard({ task, assigneeName, onPress, onPropertyPress }: TaskC
     </Pressable>
   );
 }
+
+export const TaskCard = React.memo(TaskCardInner);
 
 const styles = StyleSheet.create({
   card: {

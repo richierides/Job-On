@@ -36,6 +36,7 @@ import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
 import { Task, HouseholdMember } from "@shared/schema";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { formatMinutes, getPriorityColor, findMatchingTask } from "@/lib/utils";
 
 const RIBBON_HEIGHT = 44;
 const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 0.8 };
@@ -79,31 +80,6 @@ function parsePlanFromMessage(content: string): Plan | null {
 
 function getMessageTextOnly(content: string): string {
   return content.replace(/```json[\s\S]*?```/g, "").trim();
-}
-
-function formatMinutes(mins: number): string {
-  if (mins < 60) return `${mins}min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
-
-function findMatchingTask(taskTitle: string, tasks: Task[]): Task | null {
-  const normalized = taskTitle.toLowerCase().trim();
-  return tasks.find((t) => t.title.toLowerCase().trim() === normalized) || null;
-}
-
-function getPriorityColor(priority: string): string {
-  switch (priority) {
-    case "High":
-      return AppColors.error;
-    case "Medium":
-      return AppColors.warning;
-    case "Low":
-      return AppColors.success;
-    default:
-      return AppColors.primary;
-  }
 }
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
