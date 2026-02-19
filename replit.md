@@ -95,6 +95,7 @@ Preferred communication style: Simple, everyday language.
 - Household management: Settings → Household section with Switch, Create, Join, and Invite Members options using modals. PATCH /api/members/:id endpoint for updating member auth info. GET /api/members/:id/households for fetching all households a member belongs to.
 - Task generation timing: Server-side performance monitoring logs timing for each phase (audio extraction, Whisper transcription, GPT-4o structuring, total). Timings returned in API response as `_timings` field.
 - Performance audit (Feb 2025): TaskDashboardScreen uses FlatList (not ScrollView) for virtualized task rendering. TaskCard wrapped in React.memo. Video file operations use fs.renameSync (not copy+delete). JSON body parser limit reduced to 5MB (multer handles video uploads). Dead code removed (no-op middleware, unused MemStorage class, inline require). Shared utility functions extracted to `client/lib/utils.ts` (formatMinutes, getPriorityColor, findMatchingTask, formatDuration).
+- Task generation speed (Feb 2025): Audio extracted as compressed MP3 (not WAV) for faster Whisper upload. GPT structuring uses gpt-4o-mini (not gpt-4o) for faster response. File saving (video + thumbnail) runs in parallel with GPT structuring via Promise.all.
 
 ## Roadmap (Upcoming Features)
 - Task dependencies (tag tasks that depend on others)
