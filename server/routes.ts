@@ -37,6 +37,19 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
+function moveFile(src: string, dest: string) {
+  try {
+    fs.renameSync(src, dest);
+  } catch (err: any) {
+    if (err.code === "EXDEV") {
+      fs.copyFileSync(src, dest);
+      fs.unlinkSync(src);
+    } else {
+      throw err;
+    }
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
@@ -391,7 +404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Save video permanently
         const videoFilename = `${uuidv4()}.mp4`;
         const permanentVideoPath = path.join(UPLOADS_DIR, videoFilename);
-        fs.renameSync(tempVideoPath, permanentVideoPath);
+        moveFile(tempVideoPath, permanentVideoPath);
         const videoUrl = `/uploads/videos/${videoFilename}`;
 
         const structuringPrompt = `You are an AI assistant that analyzes home maintenance task descriptions.
@@ -449,7 +462,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           if (!fs.existsSync(thumbDir)) {
             fs.mkdirSync(thumbDir, { recursive: true });
           }
-          fs.renameSync(thumbnailFile.path, path.join(thumbDir, thumbFilename));
+          moveFile(thumbnailFile.path, path.join(thumbDir, thumbFilename));
           thumbnailUrl = `/uploads/thumbnails/${thumbFilename}`;
         }
 
