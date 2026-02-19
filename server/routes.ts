@@ -351,9 +351,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timings.uploadSizeMB = Math.round((videoFile.size / (1024 * 1024)) * 100) / 100;
 
         const tempVideoPath = videoFile.path;
-        const tempAudioPath = path.join("/tmp", `audio_${uuidv4()}.wav`);
+        const tempAudioPath = path.join("/tmp", `audio_${uuidv4()}.mp3`);
 
-        // Extract audio from video using ffmpeg
+        // Extract audio from video using ffmpeg (compressed MP3 for faster upload)
         let phaseStart = Date.now();
         const { spawn } = require("child_process");
         await new Promise<void>((resolve, reject) => {
@@ -361,9 +361,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             "-y",
             "-i", tempVideoPath,
             "-vn",
-            "-acodec", "pcm_s16le",
+            "-acodec", "libmp3lame",
             "-ar", "16000",
             "-ac", "1",
+            "-q:a", "6",
             tempAudioPath,
           ]);
 
@@ -389,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Transcribe audio using OpenAI Whisper
         phaseStart = Date.now();
-        const audioFile = await toFile(audioBuffer, "audio.wav");
+        const audioFile = await toFile(audioBuffer, "audio.mp3");
         const transcription = await openai.audio.transcriptions.create({
           file: audioFile,
           model: "gpt-4o-mini-transcribe",
@@ -401,11 +402,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Clean up temp audio file
         fs.unlinkSync(tempAudioPath);
 
-        // Save video permanently
+        // Save video and thumbnail to permanent storage while GPT structures the task (parallel)
         const videoFilename = `${uuidv4()}.mp4`;
         const permanentVideoPath = path.join(UPLOADS_DIR, videoFilename);
-        moveFile(tempVideoPath, permanentVideoPath);
         const videoUrl = `/uploads/videos/${videoFilename}`;
+
+        let thumbnailUrl: string | null = null;
+        const saveFilesPromise = (async () => {
+          moveFile(tempVideoPath, permanentVideoPath);
+          if (thumbnailFile) {
+            const thumbFilename = `${uuidv4()}.jpg`;
+            const thumbDir = path.join(process.cwd(), "uploads", "thumbnails");
+            if (!fs.existsSync(thumbDir)) {
+              fs.mkdirSync(thumbDir, { recursive: true });
+            }
+            moveFile(thumbnailFile.path, path.join(thumbDir, thumbFilename));
+            thumbnailUrl = `/uploads/thumbnails/${thumbFilename}`;
+          }
+        })();
 
         const structuringPrompt = `You are an AI assistant that analyzes home maintenance task descriptions.
 
@@ -425,17 +439,20 @@ Respond with a JSON object containing:
 Respond ONLY with valid JSON, no markdown or explanation.`;
 
         phaseStart = Date.now();
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: "You are a helpful assistant that outputs only valid JSON." },
-            { role: "user", content: structuringPrompt },
-          ],
-          response_format: { type: "json_object" },
-          max_completion_tokens: 1500,
-        });
+        const [completion] = await Promise.all([
+          openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: "You are a helpful assistant that outputs only valid JSON." },
+              { role: "user", content: structuringPrompt },
+            ],
+            response_format: { type: "json_object" },
+            max_completion_tokens: 1500,
+          }),
+          saveFilesPromise,
+        ]);
 
-        timings.gpt4oStructuringMs = Date.now() - phaseStart;
+        timings.structuringMs = Date.now() - phaseStart;
 
         const aiResponse = completion.choices[0]?.message?.content || "{}";
         let taskData;
@@ -453,17 +470,6 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
             subtasks: [],
             shoppingList: [],
           };
-        }
-
-        let thumbnailUrl: string | null = null;
-        if (thumbnailFile) {
-          const thumbFilename = `${uuidv4()}.jpg`;
-          const thumbDir = path.join(process.cwd(), "uploads", "thumbnails");
-          if (!fs.existsSync(thumbDir)) {
-            fs.mkdirSync(thumbDir, { recursive: true });
-          }
-          moveFile(thumbnailFile.path, path.join(thumbDir, thumbFilename));
-          thumbnailUrl = `/uploads/thumbnails/${thumbFilename}`;
         }
 
         const subtasks = Array.isArray(taskData.subtasks)
@@ -497,7 +503,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           uploadSizeMB: timings.uploadSizeMB,
           audioExtractionMs: timings.audioExtractionMs,
           whisperTranscriptionMs: timings.whisperTranscriptionMs,
-          gpt4oStructuringMs: timings.gpt4oStructuringMs,
+          structuringMs: timings.structuringMs,
           totalMs: timings.totalMs,
         });
 
