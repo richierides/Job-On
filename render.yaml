@@ -11,6 +11,10 @@ services:
         value: production
       - key: OPENAI_BASE_URL
         value: https://api.openai.com/v1
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+      - key: NPM_CONFIG_INCLUDE
+        value: dev
       - key: DATABASE_URL
         sync: false
       - key: OPENAI_API_KEY
