@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: home-diy-tracker-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run server:build
+    startCommand: npm run server:prod
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_BASE_URL
+        value: https://api.openai.com/v1
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: EXPO_PUBLIC_API_URL
+        sync: false

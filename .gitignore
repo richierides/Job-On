@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env.*
 .env*.local
+!.env.example
+
+# local private Codex/project bootstrap metadata and secrets
+.codex-private/
 
 # typescript
 *.tsbuildinfo

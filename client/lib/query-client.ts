@@ -1,19 +1,34 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 /**
- * Gets the base URL for the Express API server (e.g., "http://localhost:3000")
+ * Gets the base URL for the Express API server.
+ *
+ * Prefer EXPO_PUBLIC_API_URL when it is set to a full URL. EXPO_PUBLIC_DOMAIN
+ * is kept for compatibility with the original Replit setup and may be either a
+ * host name or a full URL.
  * @returns {string} The API base URL
  */
 export function getApiUrl(): string {
-  let host = process.env.EXPO_PUBLIC_DOMAIN;
+  const configuredUrl =
+    process.env.EXPO_PUBLIC_API_URL || process.env.EXPO_PUBLIC_DOMAIN;
 
-  if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+  if (!configuredUrl) {
+    throw new Error("EXPO_PUBLIC_API_URL or EXPO_PUBLIC_DOMAIN is not set");
   }
 
-  let url = new URL(`https://${host}`);
+  if (/^https?:\/\//i.test(configuredUrl)) {
+    return new URL(configuredUrl).href;
+  }
 
-  return url.href;
+  const protocol =
+    configuredUrl.startsWith("localhost") ||
+    configuredUrl.startsWith("127.0.0.1") ||
+    configuredUrl.startsWith("10.") ||
+    configuredUrl.startsWith("192.168.")
+      ? "http"
+      : "https";
+
+  return new URL(`${protocol}://${configuredUrl}`).href;
 }
 
 export function resolveMediaUrl(url: string | null | undefined): string | null {

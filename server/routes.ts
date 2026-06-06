@@ -6,7 +6,16 @@ import * as fs from "fs";
 import * as path from "path";
 import bcrypt from "bcryptjs";
 import OpenAI, { toFile } from "openai";
-import { tasks, insertTaskSchema, updateTaskSchema, households, householdMembers, insertHouseholdSchema, insertHouseholdMemberSchema, savedPlans } from "@shared/schema";
+import {
+  tasks,
+  insertTaskSchema,
+  updateTaskSchema,
+  households,
+  householdMembers,
+  insertHouseholdSchema,
+  insertHouseholdMemberSchema,
+  savedPlans,
+} from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, isNotNull } from "drizzle-orm";
 
@@ -28,8 +37,12 @@ const upload = multer({
 
 // OpenAI client for AI Integrations
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey:
+    process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL:
+    process.env.OPENAI_BASE_URL ||
+    process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ||
+    "https://api.openai.com/v1",
 });
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads", "videos");
@@ -58,10 +71,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all tasks (optionally filter by householdId)
   app.get("/api/tasks", async (req: Request, res: Response) => {
     try {
-      const householdId = req.query.householdId ? parseInt(req.query.householdId as string) : null;
+      const householdId = req.query.householdId
+        ? parseInt(req.query.householdId as string)
+        : null;
       let allTasks;
       if (householdId) {
-        allTasks = await db.select().from(tasks).where(eq(tasks.householdId, householdId)).orderBy(desc(tasks.createdAt));
+        allTasks = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.householdId, householdId))
+          .orderBy(desc(tasks.createdAt));
       } else {
         allTasks = await db.select().from(tasks).orderBy(desc(tasks.createdAt));
       }
@@ -151,7 +170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Household name is required" });
       }
       const inviteCode = generateInviteCode();
-      const [household] = await db.insert(households).values({ name, inviteCode }).returning();
+      const [household] = await db
+        .insert(households)
+        .values({ name, inviteCode })
+        .returning();
       res.status(201).json(household);
     } catch (error) {
       console.error("Error creating household:", error);
@@ -163,7 +185,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/households/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id as string);
-      const [household] = await db.select().from(households).where(eq(households.id, id));
+      const [household] = await db
+        .select()
+        .from(households)
+        .where(eq(households.id, id));
       if (!household) {
         return res.status(404).json({ error: "Household not found" });
       }
@@ -178,7 +203,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/households/code/:code", async (req: Request, res: Response) => {
     try {
       const code = (req.params.code as string).toUpperCase();
-      const [household] = await db.select().from(households).where(eq(households.inviteCode, code));
+      const [household] = await db
+        .select()
+        .from(households)
+        .where(eq(households.inviteCode, code));
       if (!household) {
         return res.status(404).json({ error: "Invalid invite code" });
       }
@@ -192,50 +220,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============ Household Member Endpoints ============
 
   // Add member to household (or link existing authenticated member)
-  app.post("/api/households/:id/members", async (req: Request, res: Response) => {
-    try {
-      const householdId = parseInt(req.params.id as string);
-      const { name, existingMemberId } = req.body;
+  app.post(
+    "/api/households/:id/members",
+    async (req: Request, res: Response) => {
+      try {
+        const householdId = parseInt(req.params.id as string);
+        const { name, existingMemberId } = req.body;
 
-      if (existingMemberId) {
-        const [updated] = await db.update(householdMembers)
-          .set({ householdId })
-          .where(eq(householdMembers.id, existingMemberId))
-          .returning();
-        if (!updated) {
-          return res.status(404).json({ error: "Member not found" });
+        if (existingMemberId) {
+          const [updated] = await db
+            .update(householdMembers)
+            .set({ householdId })
+            .where(eq(householdMembers.id, existingMemberId))
+            .returning();
+          if (!updated) {
+            return res.status(404).json({ error: "Member not found" });
+          }
+          return res.status(200).json(updated);
         }
-        return res.status(200).json(updated);
-      }
 
-      if (!name) {
-        return res.status(400).json({ error: "Member name is required" });
+        if (!name) {
+          return res.status(400).json({ error: "Member name is required" });
+        }
+        const [member] = await db
+          .insert(householdMembers)
+          .values({ householdId, name })
+          .returning();
+        res.status(201).json(member);
+      } catch (error) {
+        console.error("Error adding member:", error);
+        res.status(500).json({ error: "Failed to add member" });
       }
-      const [member] = await db.insert(householdMembers).values({ householdId, name }).returning();
-      res.status(201).json(member);
-    } catch (error) {
-      console.error("Error adding member:", error);
-      res.status(500).json({ error: "Failed to add member" });
-    }
-  });
+    },
+  );
 
   // Get all members of a household
-  app.get("/api/households/:id/members", async (req: Request, res: Response) => {
-    try {
-      const householdId = parseInt(req.params.id as string);
-      const members = await db.select().from(householdMembers).where(eq(householdMembers.householdId, householdId));
-      res.json(members);
-    } catch (error) {
-      console.error("Error fetching members:", error);
-      res.status(500).json({ error: "Failed to fetch members" });
-    }
-  });
+  app.get(
+    "/api/households/:id/members",
+    async (req: Request, res: Response) => {
+      try {
+        const householdId = parseInt(req.params.id as string);
+        const members = await db
+          .select()
+          .from(householdMembers)
+          .where(eq(householdMembers.householdId, householdId));
+        res.json(members);
+      } catch (error) {
+        console.error("Error fetching members:", error);
+        res.status(500).json({ error: "Failed to fetch members" });
+      }
+    },
+  );
 
   // Get single member
   app.get("/api/members/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id as string);
-      const [member] = await db.select().from(householdMembers).where(eq(householdMembers.id, id));
+      const [member] = await db
+        .select()
+        .from(householdMembers)
+        .where(eq(householdMembers.id, id));
       if (!member) {
         return res.status(404).json({ error: "Member not found" });
       }
@@ -256,7 +300,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (authProvider) updates.authProvider = authProvider;
       if (authProviderId) updates.authProviderId = authProviderId;
 
-      const [updated] = await db.update(householdMembers)
+      const [updated] = await db
+        .update(householdMembers)
         .set(updates)
         .where(eq(householdMembers.id, id))
         .returning();
@@ -271,51 +316,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all households a member belongs to (by shared auth identity)
-  app.get("/api/members/:id/households", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id as string);
-      const [member] = await db.select().from(householdMembers).where(eq(householdMembers.id, id));
-      if (!member) {
-        return res.status(404).json({ error: "Member not found" });
-      }
+  app.get(
+    "/api/members/:id/households",
+    async (req: Request, res: Response) => {
+      try {
+        const id = parseInt(req.params.id as string);
+        const [member] = await db
+          .select()
+          .from(householdMembers)
+          .where(eq(householdMembers.id, id));
+        if (!member) {
+          return res.status(404).json({ error: "Member not found" });
+        }
 
-      let allMembers: typeof member[] = [];
+        let allMembers: (typeof member)[] = [];
 
-      if (member.email) {
-        allMembers = await db.select().from(householdMembers)
-          .where(eq(householdMembers.email, member.email));
-      } else if (member.authProvider && member.authProviderId) {
-        allMembers = await db.select().from(householdMembers)
-          .where(and(
-            eq(householdMembers.authProvider, member.authProvider),
-            eq(householdMembers.authProviderId, member.authProviderId),
-          ));
-      } else {
-        allMembers = [member];
-      }
+        if (member.email) {
+          allMembers = await db
+            .select()
+            .from(householdMembers)
+            .where(eq(householdMembers.email, member.email));
+        } else if (member.authProvider && member.authProviderId) {
+          allMembers = await db
+            .select()
+            .from(householdMembers)
+            .where(
+              and(
+                eq(householdMembers.authProvider, member.authProvider),
+                eq(householdMembers.authProviderId, member.authProviderId),
+              ),
+            );
+        } else {
+          allMembers = [member];
+        }
 
-      const results = [];
-      for (const m of allMembers) {
-        if (m.householdId) {
-          const [h] = await db.select().from(households).where(eq(households.id, m.householdId));
-          if (h) {
-            results.push({
-              memberId: m.id,
-              memberName: m.name,
-              householdId: h.id,
-              householdName: h.name,
-              inviteCode: h.inviteCode,
-            });
+        const results = [];
+        for (const m of allMembers) {
+          if (m.householdId) {
+            const [h] = await db
+              .select()
+              .from(households)
+              .where(eq(households.id, m.householdId));
+            if (h) {
+              results.push({
+                memberId: m.id,
+                memberName: m.name,
+                householdId: h.id,
+                householdName: h.name,
+                inviteCode: h.inviteCode,
+              });
+            }
           }
         }
-      }
 
-      res.json(results);
-    } catch (error) {
-      console.error("Error fetching member households:", error);
-      res.status(500).json({ error: "Failed to fetch households" });
-    }
-  });
+        res.json(results);
+      } catch (error) {
+        console.error("Error fetching member households:", error);
+        res.status(500).json({ error: "Failed to fetch households" });
+      }
+    },
+  );
 
   // ============ Video Processing Endpoint ============
 
@@ -332,7 +392,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const timings: Record<string, number> = {};
         const totalStart = Date.now();
-        const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+        const files = req.files as
+          | { [fieldname: string]: Express.Multer.File[] }
+          | undefined;
         const videoFile = files?.video?.[0];
         const thumbnailFile = files?.thumbnail?.[0];
         const householdId = req.body.householdId;
@@ -348,7 +410,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           path: videoFile.path,
         });
 
-        timings.uploadSizeMB = Math.round((videoFile.size / (1024 * 1024)) * 100) / 100;
+        timings.uploadSizeMB =
+          Math.round((videoFile.size / (1024 * 1024)) * 100) / 100;
 
         const tempVideoPath = videoFile.path;
         const tempAudioPath = path.join("/tmp", `audio_${uuidv4()}.mp3`);
@@ -359,12 +422,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await new Promise<void>((resolve, reject) => {
           const ffmpeg = spawn("ffmpeg", [
             "-y",
-            "-i", tempVideoPath,
+            "-i",
+            tempVideoPath,
             "-vn",
-            "-acodec", "libmp3lame",
-            "-ar", "16000",
-            "-ac", "1",
-            "-q:a", "6",
+            "-acodec",
+            "libmp3lame",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-q:a",
+            "6",
             tempAudioPath,
           ]);
 
@@ -443,7 +511,11 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
           openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
-              { role: "system", content: "You are a helpful assistant that outputs only valid JSON." },
+              {
+                role: "system",
+                content:
+                  "You are a helpful assistant that outputs only valid JSON.",
+              },
               { role: "user", content: structuringPrompt },
             ],
             response_format: { type: "json_object" },
@@ -473,10 +545,16 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
         }
 
         const subtasks = Array.isArray(taskData.subtasks)
-          ? taskData.subtasks.map((s: any) => ({ title: String(s.title || ""), completed: false }))
+          ? taskData.subtasks.map((s: any) => ({
+              title: String(s.title || ""),
+              completed: false,
+            }))
           : [];
         const shoppingList = Array.isArray(taskData.shoppingList)
-          ? taskData.shoppingList.map((s: any) => ({ item: String(s.item || ""), checked: false }))
+          ? taskData.shoppingList.map((s: any) => ({
+              item: String(s.item || ""),
+              checked: false,
+            }))
           : [];
 
         const [newTask] = await db
@@ -491,7 +569,9 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
             videoUrl,
             transcript,
             householdId: householdId || null,
-            estimatedMinutes: taskData.estimatedMinutes ? Math.max(5, Math.round(taskData.estimatedMinutes)) : null,
+            estimatedMinutes: taskData.estimatedMinutes
+              ? Math.max(5, Math.round(taskData.estimatedMinutes))
+              : null,
             subtasks,
             shoppingList,
           })
@@ -511,23 +591,34 @@ Respond ONLY with valid JSON, no markdown or explanation.`;
       } catch (error: any) {
         console.error("Error processing video:", error?.message || error);
         console.error("Stack:", error?.stack);
-        res.status(500).json({ error: "Failed to process video", details: error?.message || "Unknown error" });
+        res.status(500).json({
+          error: "Failed to process video",
+          details: error?.message || "Unknown error",
+        });
       }
-    }
+    },
   );
 
   // ============ Plan Chat Endpoint ============
 
   app.post("/api/plan/chat", async (req: Request, res: Response) => {
     try {
-      const { messages, tasks: pendingTasks, members: availableMembers, householdName } = req.body;
+      const {
+        messages,
+        tasks: pendingTasks,
+        members: availableMembers,
+        householdName,
+      } = req.body;
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: "Messages array is required" });
       }
 
       const taskSummary = (pendingTasks || [])
-        .map((t: any) => `- "${t.title}" (${t.location}, ${t.priority} priority, effort ${t.effortScore}/5, ~${t.estimatedMinutes || '?'}min)`)
+        .map(
+          (t: any) =>
+            `- "${t.title}" (${t.location}, ${t.priority} priority, effort ${t.effortScore}/5, ~${t.estimatedMinutes || "?"}min)`,
+        )
         .join("\n");
 
       const memberList = (availableMembers || [])
@@ -589,7 +680,9 @@ Guidelines for planning:
         max_completion_tokens: 2000,
       });
 
-      const reply = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response.";
+      const reply =
+        completion.choices[0]?.message?.content ||
+        "Sorry, I couldn't generate a response.";
       res.json({ reply });
     } catch (error) {
       console.error("Error in plan chat:", error);
@@ -599,37 +692,66 @@ Guidelines for planning:
 
   // ============ Auth Endpoints ============
 
-  async function findOrCreateSSOUser(provider: string, providerId: string, email: string | null, name: string) {
-    const [existing] = await db.select().from(householdMembers)
-      .where(and(eq(householdMembers.authProvider, provider), eq(householdMembers.authProviderId, providerId)));
+  async function findOrCreateSSOUser(
+    provider: string,
+    providerId: string,
+    email: string | null,
+    name: string,
+  ) {
+    const [existing] = await db
+      .select()
+      .from(householdMembers)
+      .where(
+        and(
+          eq(householdMembers.authProvider, provider),
+          eq(householdMembers.authProviderId, providerId),
+        ),
+      );
     if (existing) {
       const household = existing.householdId
-        ? (await db.select().from(households).where(eq(households.id, existing.householdId)))[0]
+        ? (
+            await db
+              .select()
+              .from(households)
+              .where(eq(households.id, existing.householdId))
+          )[0]
         : null;
       return { member: existing, household, isNew: false };
     }
 
     if (email) {
-      const [byEmail] = await db.select().from(householdMembers).where(eq(householdMembers.email, email.toLowerCase().trim()));
+      const [byEmail] = await db
+        .select()
+        .from(householdMembers)
+        .where(eq(householdMembers.email, email.toLowerCase().trim()));
       if (byEmail) {
-        const [updated] = await db.update(householdMembers)
+        const [updated] = await db
+          .update(householdMembers)
           .set({ authProvider: provider, authProviderId: providerId })
           .where(eq(householdMembers.id, byEmail.id))
           .returning();
         const household = updated.householdId
-          ? (await db.select().from(households).where(eq(households.id, updated.householdId)))[0]
+          ? (
+              await db
+                .select()
+                .from(households)
+                .where(eq(households.id, updated.householdId))
+            )[0]
           : null;
         return { member: updated, household, isNew: false };
       }
     }
 
-    const [newMember] = await db.insert(householdMembers).values({
-      name,
-      email: email ? email.toLowerCase().trim() : null,
-      authProvider: provider,
-      authProviderId: providerId,
-      householdId: null,
-    }).returning();
+    const [newMember] = await db
+      .insert(householdMembers)
+      .values({
+        name,
+        email: email ? email.toLowerCase().trim() : null,
+        authProvider: provider,
+        authProviderId: providerId,
+        householdId: null,
+      })
+      .returning();
     return { member: newMember, household: null, isNew: true };
   }
 
@@ -637,14 +759,22 @@ Guidelines for planning:
     try {
       const { identityToken, user, fullName, email } = req.body;
       if (!identityToken || !user) {
-        return res.status(400).json({ error: "Identity token and user ID are required" });
+        return res
+          .status(400)
+          .json({ error: "Identity token and user ID are required" });
       }
 
       const name = fullName
-        ? [fullName.givenName, fullName.familyName].filter(Boolean).join(" ") || "User"
+        ? [fullName.givenName, fullName.familyName].filter(Boolean).join(" ") ||
+          "User"
         : "User";
 
-      const result = await findOrCreateSSOUser("apple", user, email || null, name);
+      const result = await findOrCreateSSOUser(
+        "apple",
+        user,
+        email || null,
+        name,
+      );
 
       res.json({
         member: {
@@ -670,7 +800,9 @@ Guidelines for planning:
         return res.status(400).json({ error: "ID token is required" });
       }
 
-      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+      const response = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`,
+      );
       if (!response.ok) {
         return res.status(401).json({ error: "Invalid Google token" });
       }
@@ -681,7 +813,12 @@ Guidelines for planning:
         return res.status(401).json({ error: "Invalid Google token data" });
       }
 
-      const result = await findOrCreateSSOUser("google", googleId, email || null, name || "User");
+      const result = await findOrCreateSSOUser(
+        "google",
+        googleId,
+        email || null,
+        name || "User",
+      );
 
       res.json({
         member: {
@@ -704,26 +841,38 @@ Guidelines for planning:
     try {
       const { name, email, password } = req.body;
       if (!name || !email || !password) {
-        return res.status(400).json({ error: "Name, email, and password are required" });
+        return res
+          .status(400)
+          .json({ error: "Name, email, and password are required" });
       }
       if (password.length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters" });
+        return res
+          .status(400)
+          .json({ error: "Password must be at least 6 characters" });
       }
 
       const normalizedEmail = email.toLowerCase().trim();
-      const [existing] = await db.select().from(householdMembers).where(eq(householdMembers.email, normalizedEmail));
+      const [existing] = await db
+        .select()
+        .from(householdMembers)
+        .where(eq(householdMembers.email, normalizedEmail));
       if (existing) {
-        return res.status(409).json({ error: "An account with this email already exists" });
+        return res
+          .status(409)
+          .json({ error: "An account with this email already exists" });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
-      const [newMember] = await db.insert(householdMembers).values({
-        name: name.trim(),
-        email: normalizedEmail,
-        passwordHash,
-        authProvider: "email",
-        householdId: null,
-      }).returning();
+      const [newMember] = await db
+        .insert(householdMembers)
+        .values({
+          name: name.trim(),
+          email: normalizedEmail,
+          passwordHash,
+          authProvider: "email",
+          householdId: null,
+        })
+        .returning();
 
       res.json({
         member: {
@@ -746,10 +895,15 @@ Guidelines for planning:
     try {
       const { email, password } = req.body;
       if (!email || !password) {
-        return res.status(400).json({ error: "Email and password are required" });
+        return res
+          .status(400)
+          .json({ error: "Email and password are required" });
       }
 
-      const [member] = await db.select().from(householdMembers).where(eq(householdMembers.email, email.toLowerCase().trim()));
+      const [member] = await db
+        .select()
+        .from(householdMembers)
+        .where(eq(householdMembers.email, email.toLowerCase().trim()));
       if (!member || !member.passwordHash) {
         return res.status(401).json({ error: "Invalid email or password" });
       }
@@ -760,7 +914,12 @@ Guidelines for planning:
       }
 
       const household = member.householdId
-        ? (await db.select().from(households).where(eq(households.id, member.householdId)))[0]
+        ? (
+            await db
+              .select()
+              .from(households)
+              .where(eq(households.id, member.householdId))
+          )[0]
         : null;
 
       res.json({
@@ -784,21 +943,33 @@ Guidelines for planning:
     try {
       const { memberId, email, password } = req.body;
       if (!memberId || !email || !password) {
-        return res.status(400).json({ error: "Member ID, email, and password are required" });
+        return res
+          .status(400)
+          .json({ error: "Member ID, email, and password are required" });
       }
       if (password.length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters" });
+        return res
+          .status(400)
+          .json({ error: "Password must be at least 6 characters" });
       }
 
-      const [existingMember] = await db.select().from(householdMembers).where(eq(householdMembers.id, memberId));
+      const [existingMember] = await db
+        .select()
+        .from(householdMembers)
+        .where(eq(householdMembers.id, memberId));
       if (!existingMember) {
         return res.status(404).json({ error: "Member not found" });
       }
 
       const normalizedEmail = email.toLowerCase().trim();
-      const [emailTaken] = await db.select().from(householdMembers).where(eq(householdMembers.email, normalizedEmail));
+      const [emailTaken] = await db
+        .select()
+        .from(householdMembers)
+        .where(eq(householdMembers.email, normalizedEmail));
       if (emailTaken && emailTaken.id !== memberId) {
-        return res.status(409).json({ error: "This email is already registered" });
+        return res
+          .status(409)
+          .json({ error: "This email is already registered" });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
@@ -808,7 +979,15 @@ Guidelines for planning:
         .where(eq(householdMembers.id, memberId))
         .returning();
 
-      res.json({ success: true, member: { id: updated.id, name: updated.name, email: updated.email, householdId: updated.householdId } });
+      res.json({
+        success: true,
+        member: {
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          householdId: updated.householdId,
+        },
+      });
     } catch (error) {
       console.error("Error registering:", error);
       res.status(500).json({ error: "Failed to register account" });
@@ -819,11 +998,17 @@ Guidelines for planning:
 
   app.get("/api/plans", async (req: Request, res: Response) => {
     try {
-      const householdId = req.query.householdId ? parseInt(req.query.householdId as string) : null;
+      const householdId = req.query.householdId
+        ? parseInt(req.query.householdId as string)
+        : null;
       if (!householdId) {
         return res.status(400).json({ error: "householdId is required" });
       }
-      const plans = await db.select().from(savedPlans).where(eq(savedPlans.householdId, householdId)).orderBy(desc(savedPlans.createdAt));
+      const plans = await db
+        .select()
+        .from(savedPlans)
+        .where(eq(savedPlans.householdId, householdId))
+        .orderBy(desc(savedPlans.createdAt));
       res.json(plans);
     } catch (error) {
       console.error("Error fetching plans:", error);
@@ -835,13 +1020,18 @@ Guidelines for planning:
     try {
       const { householdId, name, planData } = req.body;
       if (!householdId || !planData) {
-        return res.status(400).json({ error: "householdId and planData are required" });
+        return res
+          .status(400)
+          .json({ error: "householdId and planData are required" });
       }
-      const [newPlan] = await db.insert(savedPlans).values({
-        householdId,
-        name: name || "My Plan",
-        planData,
-      }).returning();
+      const [newPlan] = await db
+        .insert(savedPlans)
+        .values({
+          householdId,
+          name: name || "My Plan",
+          planData,
+        })
+        .returning();
       res.status(201).json(newPlan);
     } catch (error) {
       console.error("Error saving plan:", error);
@@ -851,7 +1041,7 @@ Guidelines for planning:
 
   app.delete("/api/plans/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       await db.delete(savedPlans).where(eq(savedPlans.id, id));
       res.json({ success: true });
     } catch (error) {

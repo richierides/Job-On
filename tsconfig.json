@@ -10,5 +10,13 @@
     "types": ["node"]
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist",
+    "server_dist",
+    "server/replit_integrations",
+    "client/navigation/MainTabNavigator26.tsx",
+    "**/*.test.ts"
+  ]
 }

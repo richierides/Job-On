@@ -17,6 +17,26 @@ function setupCors(app: express.Application) {
   app.use((req, res, next) => {
     const origins = new Set<string>();
 
+    if (process.env.ALLOWED_ORIGINS) {
+      process.env.ALLOWED_ORIGINS.split(",").forEach((origin) => {
+        const trimmed = origin.trim();
+        if (trimmed) origins.add(trimmed);
+      });
+    }
+
+    if (process.env.EXPO_PUBLIC_API_URL) {
+      origins.add(process.env.EXPO_PUBLIC_API_URL);
+    }
+
+    if (process.env.EXPO_PUBLIC_DOMAIN) {
+      const domain = process.env.EXPO_PUBLIC_DOMAIN;
+      origins.add(domain.startsWith("http") ? domain : `https://${domain}`);
+    }
+
+    if (process.env.RENDER_EXTERNAL_URL) {
+      origins.add(process.env.RENDER_EXTERNAL_URL);
+    }
+
     if (process.env.REPLIT_DEV_DOMAIN) {
       origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
     }
@@ -29,13 +49,16 @@ function setupCors(app: express.Application) {
 
     const origin = req.header("origin");
 
-    const isLocalhost =
+    const isLocalNetwork =
       origin?.startsWith("http://localhost:") ||
-      origin?.startsWith("http://127.0.0.1:");
+      origin?.startsWith("http://127.0.0.1:") ||
+      origin?.startsWith("http://10.") ||
+      origin?.startsWith("http://192.168.");
 
-    const isReplitOrigin = origin?.includes(".replit.dev") || origin?.includes(".repl.co");
+    const isReplitOrigin =
+      origin?.includes(".replit.dev") || origin?.includes(".repl.co");
 
-    if (origin && (origins.has(origin) || isLocalhost || isReplitOrigin)) {
+    if (origin && (origins.has(origin) || isLocalNetwork || isReplitOrigin)) {
       res.header("Access-Control-Allow-Origin", origin);
       res.header(
         "Access-Control-Allow-Methods",
@@ -239,14 +262,14 @@ function setupErrorHandler(app: express.Application) {
   setupErrorHandler(app);
 
   const port = parseInt(process.env.PORT || "5000", 10);
+  const host = process.env.HOST || "0.0.0.0";
   server.listen(
     {
       port,
-      host: "0.0.0.0",
-      reusePort: true,
+      host,
     },
     () => {
-      log(`express server serving on port ${port}`);
+      log(`express server serving on ${host}:${port}`);
     },
   );
 })();
