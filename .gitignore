@@ -57,3 +57,13 @@ app-example
 # user-uploaded media (videos + thumbnails)
 /uploads/videos/
 /uploads/thumbnails/
+
+# Hometaking local QA and generated previews
+/dist-hometaking/
+/artifacts/hometaking/
+
+# Private local room plans and revision history
+/.hometaking-data/
+
+# Private pre-migration backups
+/.hometaking-backups/

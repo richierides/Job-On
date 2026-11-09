@@ -1,8 +1,25 @@
-# Home DIY Tracker
+> Hometaking now combines native room capture and the earlier Room Planner. Read [the combined product guide](docs/COMBINED-HOMETAKING.md) for preserved plans, accounts, development services and remaining physical-device checks.
 
-Expo SDK 54 mobile app with an Express API. This repository is the phase-one
-migration from Replit: keep the current product behavior while making local,
-Expo Go, Render, and Supabase setup repeatable.
+# Hometaking
+
+Hometaking is a consumer room-planning app, with an editorial visual direction inspired by Wallpaper. The first working pilot has measured rooms, furniture placement, inspiration pictures, product links, shopping lists and tasks. The guided flow now includes a 3D Reveal stage. The old voice/video DIY interface is no longer linked from Hometaking.
+
+## Room-planning pilot
+
+Run `npm install`, then `npm run expo:dev -- --web`. The Hometaking pilot opens without an account, API key or database. Start with the labelled example room or add your own rectangular room. Pictures are inspiration, not renders of the measured layout.
+
+For a static local preview:
+
+```sh
+npx expo export --platform web --output-dir dist-hometaking
+npm run preview:hometaking
+```
+
+Open http://127.0.0.1:8081. Data is stored on that browser/device and automatically copied to the local preview server in `.hometaking-data/`, with retained revisions. This is local storage, not cloud sync. Project settings provides portable JSON backup and restore. See [HOMETAKING.md](HOMETAKING.md) for the pilot scope, model and next milestones, and [design-qa.md](design-qa.md) for validation.
+
+Native room capture is now implemented for custom iOS builds on supported LiDAR devices, with a photos/manual fallback. Physical-device acceptance testing is still required. Read [installation and testing instructions](docs/ROOM-SCANNING.md) before scanning. Expo Go cannot run RoomPlan.
+
+The sections below describe the existing Express-backed DIY features, which require their own API and database.
 
 ## Phase One: Run As Is
 

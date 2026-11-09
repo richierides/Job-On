@@ -307,7 +307,7 @@ export default function OnboardingScreen() {
     if (!createdHousehold) return;
     try {
       await Share.share({
-        message: `Join my household on Home DIY Tracker! Use invite code: ${createdHousehold.inviteCode}`,
+        message: `Join my household on Hometaking! Use invite code: ${createdHousehold.inviteCode}`,
       });
     } catch (_) {}
   };
@@ -333,7 +333,7 @@ export default function OnboardingScreen() {
     <View style={styles.content}>
       <View style={styles.header}>
         <Image source={appIcon} style={styles.appIcon} />
-        <ThemedText style={[styles.title, { color: theme.text }]}>Home DIY Tracker</ThemedText>
+        <ThemedText style={[styles.title, { color: theme.text }]}>Hometaking</ThemedText>
         <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
           Capture repairs with video, let AI organize everything
         </ThemedText>

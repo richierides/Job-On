@@ -1,3 +1,4 @@
+import {conversation} from "./hometaking/conversation";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -18,7 +19,7 @@ function setupCors(app: express.Application) {
     const origins = new Set<string>();
 
     if (process.env.ALLOWED_ORIGINS) {
-      process.env.ALLOWED_ORIGINS.split(",").forEach((origin) => {
+      process.env.ALLOWED_ORIGINS.split(",").forEach((origin: string) => {
         const trimmed = origin.trim();
         if (trimmed) origins.add(trimmed);
       });
@@ -42,7 +43,7 @@ function setupCors(app: express.Application) {
     }
 
     if (process.env.REPLIT_DOMAINS) {
-      process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
+      process.env.REPLIT_DOMAINS.split(",").forEach((d: string) => {
         origins.add(`https://${d.trim()}`);
       });
     }
@@ -64,7 +65,7 @@ function setupCors(app: express.Application) {
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, PATCH, DELETE, OPTIONS",
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type");
+      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
       res.header("Access-Control-Allow-Credentials", "true");
     }
 
@@ -107,7 +108,7 @@ function setupRequestLogging(app: express.Application) {
       const duration = Date.now() - start;
 
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+      if (capturedJsonResponse && !path.startsWith("/api/hometaking")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
@@ -253,6 +254,7 @@ function setupErrorHandler(app: express.Application) {
 (async () => {
   setupCors(app);
   setupBodyParsing(app);
+  app.use("/api/hometaking", conversation);
   setupRequestLogging(app);
 
   configureExpoAndLanding(app);

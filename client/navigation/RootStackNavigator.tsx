@@ -1,4 +1,5 @@
 import React from "react";
+import HometakingScreen from "@/hometaking/HometakingScreen";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { HeaderButton } from "@react-navigation/elements";
 import { Pressable, ActivityIndicator, View } from "react-native";
@@ -18,6 +19,7 @@ import { useUserSession } from "@/contexts/UserSessionContext";
 import { Task } from "@shared/schema";
 
 export type RootStackParamList = {
+  Hometaking: undefined;
   Onboarding: undefined;
   TaskDashboard: undefined;
   TaskDetail: { task: Task };
@@ -36,7 +38,14 @@ export default function RootStackNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.backgroundRoot }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: theme.backgroundRoot,
+        }}
+      >
         <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
@@ -44,6 +53,11 @@ export default function RootStackNavigator() {
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
+      <Stack.Screen
+        name="Hometaking"
+        component={HometakingScreen}
+        options={{ headerShown: false }}
+      />
       {!isOnboarded ? (
         <Stack.Screen
           name="Onboarding"
@@ -56,11 +70,9 @@ export default function RootStackNavigator() {
             name="TaskDashboard"
             component={TaskDashboardScreen}
             options={({ navigation }) => ({
-              headerTitle: () => <HeaderTitle title="Home DIY Tracker" />,
+              headerTitle: () => <HeaderTitle title="Hometaking" />,
               headerRight: () => (
-                <HeaderButton
-                  onPress={() => navigation.navigate("Settings")}
-                >
+                <HeaderButton onPress={() => navigation.navigate("Settings")}>
                   <Feather name="settings" size={22} color={theme.text} />
                 </HeaderButton>
               ),
